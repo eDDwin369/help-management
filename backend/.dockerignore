@@ -1,0 +1,22 @@
+# Backend-specific build exclusions.
+# The root .dockerignore also applies; these entries add backend-local
+# exclusions for cases where the Dockerfile copies backend/ directly.
+
+node_modules
+dist
+coverage
+
+# Secrets — never bake into an image
+.env
+.env.local
+.env.test
+.env.*.local
+# Keep .env.example — dotenv-safe uses it to validate required keys
+!.env.example
+
+*.log
+*.tsbuildinfo
+
+# Test artefacts
+jest.config.js
+src/tests

@@ -1,0 +1,30 @@
+// Prisma schema for support-app
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ResolutionStatus {
+  PENDING
+  RESOLVED
+  NOT_RESOLVED
+}
+
+model SupportSession {
+  id               String           @id @default(uuid())
+  userMessage      String           @db.Text
+  botResponse      String           @db.Text
+  resolutionStatus ResolutionStatus @default(PENDING)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([resolutionStatus])
+  @@index([createdAt])
+  @@map("support_sessions")
+}

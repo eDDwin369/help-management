@@ -1,0 +1,22 @@
+# Frontend-specific build exclusions.
+# The root .dockerignore also applies; these entries add frontend-local
+# exclusions for cases where the Dockerfile copies frontend/ directly.
+
+node_modules
+dist
+coverage
+
+# Secrets — never bake into an image
+.env
+.env.local
+.env.test
+.env.*.local
+# Keep .env.example — the Dockerfile copies it as the base .env
+!.env.example
+
+*.log
+*.tsbuildinfo
+
+# Test artefacts
+src/tests
+vitest.config*
