@@ -10,7 +10,7 @@ import { DEMO_ACCOUNTS } from "./demo-accounts";
  * arbitrary email or an arbitrary role.
  */
 export const ensureDemoAccount = createServerFn({ method: "POST" })
-  .validator(z.object({ email: z.string().email() }))
+  .inputValidator((input) => z.object({ email: z.string().email() }).parse(input))
   .handler(async ({ data }) => {
     const account = DEMO_ACCOUNTS.find((a) => a.email === data.email.trim().toLowerCase());
     if (!account) return { ok: false as const, error: "Not a demo account" };
