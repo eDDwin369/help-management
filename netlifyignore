@@ -1,18 +1,7 @@
-# Exclude everything that should not be uploaded to Netlify
+# Netlify deploy zip exclusions
+# Netlify installs its own node_modules — never include them
 node_modules/
 .output/
 .wrangler/
-.git/
-src/
-public/
-supabase/
-*.log
-*.tgz
-bun.lock
-bunfig.toml
-eslint.config.js
-tsconfig.json
-vite.config.ts
-vite.spa.config.ts
-wrangler.jsonc
-components.json
+.tanstack/
+.lovable/

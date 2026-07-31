@@ -30,3 +30,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+.output/
+.wrangler/
+.tanstack/
+.lovable/
+dist/
+node_modules/
+*.tgz

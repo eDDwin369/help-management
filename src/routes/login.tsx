@@ -13,7 +13,7 @@ import { ensureDemoAccount } from "@/lib/demo-auth.functions";
 
 
 
-type AppRedirect = "/dashboard" | "/tickets";
+type AppRedirect = "/dashboard" | "/tickets" | "/admin";
 
 function normalizeRedirect(value: unknown): AppRedirect {
   return value === "/tickets" || value === "/dashboard" ? value : "/dashboard";
@@ -74,7 +74,7 @@ function LoginPage() {
       let res = await login(email.trim(), password);
       // Demo workspace accounts are provisioned server-side on first use.
       if (!res.ok && isDemoEmail) {
-        const provision = await ensureDemoAccount({ data: { email: email.trim().toLowerCase() } });
+        const provision = await ensureDemoAccount({ data: { email: email.trim() } });
         if (!provision.ok) {
           toast.error(provision.error ?? "Could not prepare demo account");
           return;
@@ -92,7 +92,7 @@ function LoginPage() {
    * Demo workspace credentials: clicking a card only POPULATES the form.
    * The user must press "Sign in" themselves — no automatic login.
    */
-  const useDemoAccount = (demoEmail: string, demoPassword: string) => {
+  const applyDemoCredentials = (demoEmail: string, demoPassword: string) => {
     setMode("signin");
     setEmail(demoEmail);
     setPassword(demoPassword);
@@ -217,7 +217,7 @@ function LoginPage() {
                   {DEMO_ACCOUNTS.filter((c) => c.role === g.key).map((c) => (
                     <button
                       key={c.email}
-                      onClick={() => void useDemoAccount(c.email, c.password)}
+                      onClick={() => void applyDemoCredentials(c.email, c.password)}
                       disabled={loading}
                       type="button"
                       className="w-full text-left p-2.5 rounded-lg border hover:border-primary/40 hover:bg-muted/40 transition-colors group disabled:opacity-60"
