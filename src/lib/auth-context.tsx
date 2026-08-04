@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const timer = setTimeout(() => {
       // If you want it to start logged out, change MOCK_USER to null here.
-      setUser(MOCK_USER);
+      setUser(null);
       setIsLoading(false);
     }, 500);
     return () => clearTimeout(timer);

@@ -102,7 +102,7 @@ function LoginPage() {
   const roleGroups = [
     { key: "customer", label: "Customer", icon: Users, tint: "from-blue-500 to-cyan-500" },
     { key: "sub_admin", label: "Help Admin", icon: UserCog, tint: "from-violet-500 to-fuchsia-500" },
-    { key: "admin", label: "Admin", icon: Shield, tint: "from-emerald-500 to-teal-500" },
+    { key: "admin", label: "Superadmin", icon: Shield, tint: "from-emerald-500 to-teal-500" },
   ] as const;
 
 

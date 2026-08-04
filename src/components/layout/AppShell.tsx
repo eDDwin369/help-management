@@ -42,7 +42,7 @@ import { useStoreVersion } from "@/lib/use-store";
 
 function roleLabel(role: string) {
   if (role === "sub_admin") return "Help Admin";
-  if (role === "admin") return "Admin";
+  if (role === "admin") return "Superadmin";
   if (role === "customer") return "Customer";
   return role;
 }
@@ -88,7 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     { to: "/tickets", label: "Tickets", icon: Ticket, show: true, context: "app-nav-tickets" },
     {
       to: "/admin",
-      label: "Admin",
+      label: "Superadmin",
       icon: ShieldCheck,
       show: user.role === "admin" || user.role === "sub_admin",
       context: "app-nav-admin",
