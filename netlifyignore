@@ -1,7 +1,0 @@
-# Netlify deploy zip exclusions
-# Netlify installs its own node_modules — never include them
-node_modules/
-.output/
-.wrangler/
-.tanstack/
-.lovable/
