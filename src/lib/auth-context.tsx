@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Role, User } from "./types";
+import { DEMO_ACCOUNTS } from "./demo-accounts";
 
 interface AuthCtx {
   user: User | null;
@@ -43,10 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login: AuthCtx["login"] = async (email, password) => {
     // Instantly succeed with any credentials
+    const demo = DEMO_ACCOUNTS.find((a) => a.email === email.trim().toLowerCase());
     setUser({
       ...MOCK_USER,
       email: email.trim(),
-      name: email.split("@")[0],
+      name: demo ? demo.name : email.split("@")[0],
+      role: demo ? demo.role : "customer",
       avatarColor: COLORS[email.length % COLORS.length],
     });
     return { ok: true };
