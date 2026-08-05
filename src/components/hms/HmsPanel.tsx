@@ -824,7 +824,7 @@ function ListView({
             onSelected={() => setFilterOpen(false)}
           />
         )}
-        {!isEmpty && (
+        {((role !== "customer" && !isEmpty) || (search.trim().length > 0 && !isEmpty)) && (
           <div
             className="flex items-center justify-between shrink-0"
             style={{
@@ -851,7 +851,7 @@ function ListView({
           role={isEmpty ? undefined : "list"}
           aria-label={isEmpty ? undefined : "Related help articles"}
         >
-          {!isEmpty &&
+          {((role !== "customer" && !isEmpty) || (search.trim().length > 0 && !isEmpty)) &&
             paged.map((a) => (
               <button
                 key={a.id}
@@ -884,8 +884,8 @@ function ListView({
               </button>
             ))}
 
-          {/* AI Assistant Welcome Greeting & Clickable Chips */}
-          <div className="p-4 border-t border-gray-100 bg-gradient-to-b from-white via-purple-50/20 to-pink-50/20 space-y-3 mt-2">
+          {/* AI Assistant Welcome Greeting & Clickable Chips (First Message) */}
+          <div className="p-4 bg-gradient-to-b from-white via-purple-50/20 to-pink-50/20 space-y-3">
             <p className="text-xs font-semibold text-gray-900 leading-relaxed">
               Hello! Curious about what you're watching? I'm here to help.
             </p>
@@ -917,16 +917,19 @@ function ListView({
                 Recommend related content
               </button>
 
-              {filtered.slice(0, 2).map((art) => (
-                <button
-                  key={`chip-${art.id}`}
-                  type="button"
-                  onClick={() => goTo({ name: "ai-chat", initialPrompt: art.title })}
-                  className="px-3.5 py-1.5 rounded-full border border-gray-300 bg-white hover:bg-purple-50 hover:border-purple-300 text-xs font-medium text-gray-800 transition-all shadow-xs hover:shadow active:scale-95 text-right cursor-pointer truncate max-w-[240px]"
-                >
-                  {art.title}
-                </button>
-              ))}
+              {state.articles
+                .filter((a) => a.approvalStatus === "approved")
+                .slice(0, 2)
+                .map((art) => (
+                  <button
+                    key={`chip-${art.id}`}
+                    type="button"
+                    onClick={() => goTo({ name: "ai-chat", initialPrompt: art.title })}
+                    className="px-3.5 py-1.5 rounded-full border border-gray-300 bg-white hover:bg-purple-50 hover:border-purple-300 text-xs font-medium text-gray-800 transition-all shadow-xs hover:shadow active:scale-95 text-right cursor-pointer truncate max-w-[240px]"
+                  >
+                    {art.title}
+                  </button>
+                ))}
             </div>
           </div>
         </div>
