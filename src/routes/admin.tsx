@@ -43,6 +43,7 @@ import {
   LifeBuoy,
   Ticket as TicketIcon,
   Trash2,
+  X,
   Users,
   Video,
   BarChart3,
@@ -116,7 +117,7 @@ function AdminPage() {
           <TabsList className="bg-transparent border-b w-full justify-start h-auto p-0 rounded-none gap-1">
             {[
               { v: "overview", label: "Dashboard", icon: LayoutDashboard, context: "admin-overview-tab" },
-              { v: "content", label: "Content Library", icon: Library, context: "admin-content-library-tab" },
+              { v: "content", label: user?.role === "sub_admin" ? "My Approvals" : "Approvals", icon: Library, context: "admin-content-library-tab" },
               { v: "coverage", label: "Areas Without Help", icon: AlertTriangle, context: "admin-coverage-tab" },
               { v: "usage", label: "Usage Analytics", icon: BarChart3, context: "admin-usage-tab" },
             ].map((t) => (
@@ -543,6 +544,7 @@ const TYPE_ICON = { video: Video, pdf: FileText, image: ImageIcon, text: FileTex
 const PAGE_SIZE = 8;
 
 function ContentLibraryTab({ canApprove }: { canApprove: boolean }) {
+  const { user } = useAuth();
   const {
     state,
     approveArticle,
@@ -585,7 +587,7 @@ function ContentLibraryTab({ canApprove }: { canApprove: boolean }) {
     <div className="bg-card border rounded-2xl overflow-hidden">
       <div className="flex items-center justify-between gap-3 px-4 pt-4">
         <div>
-          <div className="font-semibold text-sm">Content Library</div>
+          <div className="font-semibold text-sm">{user?.role === "sub_admin" ? "My Approvals" : "Approvals"}</div>
           <p className="text-xs text-muted-foreground">Every help article across the system</p>
         </div>
         <Button size="sm" className="h-8 gap-1.5" onClick={() => requestPanelView({ type: "add" })}>
@@ -595,7 +597,7 @@ function ContentLibraryTab({ canApprove }: { canApprove: boolean }) {
       <SectionToolbar
         searchContext="admin-content-search"
         filterContext="admin-content-filter"
-        placeholder="Search content library…"
+        placeholder="Search approvals…"
         query={query}
         onQueryChange={setQuery}
         filterActive={filterActive}
@@ -662,14 +664,18 @@ function ContentLibraryTab({ canApprove }: { canApprove: boolean }) {
                           ? "bg-muted text-muted-foreground hover:bg-muted"
                           : a.approvalStatus === "approved"
                             ? "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/15"
-                            : "bg-amber-500/15 text-amber-600 hover:bg-amber-500/15"
+                            : a.approvalStatus === "unapproved"
+                              ? "bg-rose-500/15 text-rose-600 hover:bg-rose-500/15"
+                              : "bg-amber-500/15 text-amber-600 hover:bg-amber-500/15"
                       }
                     >
                       {a.archiveStatus === "archived"
                         ? "Archived"
                         : a.approvalStatus === "approved"
                           ? "Approved"
-                          : "Unapproved"}
+                          : a.approvalStatus === "unapproved"
+                            ? "Rejected"
+                            : "Pending Approval"}
                     </Badge>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground text-xs">{a.authorName}</td>
@@ -693,32 +699,36 @@ function ContentLibraryTab({ canApprove }: { canApprove: boolean }) {
                       >
                         <Pencil className="size-3.5" />
                       </Button>
-                      {canApprove &&
-                        (a.approvalStatus === "approved" ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 px-2 text-xs"
-                            onClick={() => {
-                              unapproveArticle(a.id);
-                              toast.success("Unapproved");
-                            }}
-                          >
-                            Unapprove
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 px-2 text-xs text-emerald-600 gap-1"
-                            onClick={() => {
-                              approveArticle(a.id);
-                              toast.success("Approved");
-                            }}
-                          >
-                            <Check className="size-3" /> Approve
-                          </Button>
-                        ))}
+                      {canApprove && (
+                        <>
+                          {a.approvalStatus !== "approved" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 gap-1"
+                              onClick={() => {
+                                approveArticle(a.id);
+                                toast.success("Approved — live for customers");
+                              }}
+                            >
+                              <Check className="size-3" /> Approve
+                            </Button>
+                          )}
+                          {a.approvalStatus !== "unapproved" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 gap-1"
+                              onClick={() => {
+                                unapproveArticle(a.id);
+                                toast.success("Rejected — hidden from customers");
+                              }}
+                            >
+                              <X className="size-3" /> Reject
+                            </Button>
+                          )}
+                        </>
+                      )}
                       <Button
                         size="icon"
                         variant="ghost"

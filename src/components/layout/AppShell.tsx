@@ -39,6 +39,7 @@ import { MyTicketsSheet } from "@/components/help/MyTicketsSheet";
 import { ContactSupportDialog } from "@/components/help/ContactSupportDialog";
 import { ticketStore } from "@/lib/mock-data";
 import { useStoreVersion } from "@/lib/use-store";
+import { useHmsStore } from "@/components/hms/hmsStore";
 
 function roleLabel(role: string) {
   if (role === "sub_admin") return "Help Admin";
@@ -51,12 +52,23 @@ export function AppShell({ children }: { children: ReactNode }) {
   useStoreVersion();
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
+  const { isOpen: isHmsOpen, closePanel } = useHmsStore();
   const navigate = useNavigate();
   const router = useRouter();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [ticketsOpen, setTicketsOpen] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close other popovers/sheets when HMS Panel opens
+  useEffect(() => {
+    if (isHmsOpen) {
+      setMenuOpen(false);
+      setTicketsOpen(false);
+      setSupportOpen(false);
+    }
+  }, [isHmsOpen]);
 
   // Keep the fullscreen icon in sync with the browser's own state (Esc, F11).
   useEffect(() => {
@@ -88,7 +100,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     { to: "/tickets", label: "Tickets", icon: Ticket, show: true, context: "app-nav-tickets" },
     {
       to: "/admin",
-      label: "Superadmin",
+      label: user.role === "sub_admin" ? "Help Admin" : "Superadmin",
       icon: ShieldCheck,
       show: user.role === "admin" || user.role === "sub_admin",
       context: "app-nav-admin",
@@ -103,12 +115,19 @@ export function AppShell({ children }: { children: ReactNode }) {
           className="w-[68px] border-r bg-card flex flex-col items-center py-4 gap-2 shrink-0"
           data-hms-context="app-sidebar"
         >
-          <div className="size-10 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-primary-foreground font-bold mb-2 shadow-sm">
-            <Eye className="size-5" />
-          </div>
-          <div className="text-[9px] uppercase tracking-wider text-muted-foreground -mt-1 mb-2">
-            OomniEye
-          </div>
+          <button
+            onClick={() => navigate({ to: "/dashboard" })}
+            className="flex flex-col items-center group cursor-pointer focus:outline-none"
+            title="Go to Dashboard"
+            aria-label="Go to Dashboard"
+          >
+            <div className="size-10 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center text-primary-foreground font-bold mb-2 shadow-sm group-hover:opacity-90 group-hover:scale-105 transition-all">
+              <Eye className="size-5" />
+            </div>
+            <div className="text-[9px] uppercase tracking-wider text-muted-foreground -mt-1 mb-2 group-hover:text-foreground transition-colors">
+              OomniEye
+            </div>
+          </button>
           {nav.map((n) => {
             const active = path.startsWith(n.to);
             return (
@@ -186,7 +205,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               <HeaderIconButton
                 label="Contact Support"
                 context="app-support"
-                onClick={() => setSupportOpen(true)}
+                onClick={() => {
+                  closePanel();
+                  setSupportOpen(true);
+                }}
               >
                 <MessageSquare className="size-4" />
               </HeaderIconButton>
@@ -194,7 +216,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               <HeaderIconButton
                 label="My Tickets"
                 context="app-tickets-button"
-                onClick={() => setTicketsOpen(true)}
+                onClick={() => {
+                  closePanel();
+                  setTicketsOpen(true);
+                }}
                 badge={openTickets || undefined}
               >
                 <Ticket className="size-4" />
@@ -208,7 +233,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Settings className="size-4" />
               </HeaderIconButton>
 
-              <DropdownMenu>
+              <DropdownMenu
+                open={menuOpen}
+                onOpenChange={(open) => {
+                  if (open) closePanel();
+                  setMenuOpen(open);
+                }}
+              >
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <DropdownMenuTrigger asChild>
@@ -235,10 +266,20 @@ export function AppShell({ children }: { children: ReactNode }) {
                     </Badge>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => setTicketsOpen(true)}>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      closePanel();
+                      setTicketsOpen(true);
+                    }}
+                  >
                     <Ticket className="size-4 mr-2" /> My Tickets
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setSupportOpen(true)}>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      closePanel();
+                      setSupportOpen(true);
+                    }}
+                  >
                     <MessageSquare className="size-4 mr-2" /> Contact Support
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={toggle}>

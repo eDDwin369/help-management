@@ -19,31 +19,58 @@ import {
   type ViewMode,
 } from "./SectionToolbar";
 
+import { useAuth } from "@/lib/auth-context";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
 type KindFilter = "all" | "folder" | "pdf";
 
 export function MyDrawingsView() {
+  const { user } = useAuth();
+  const [drawings, setDrawings] = useState<DrawingItem[]>(DRAWING_ITEMS);
   const [query, setQuery] = useState("");
   const [view, setView] = useState<ViewMode>("list");
   const [kind, setKind] = useState<KindFilter>("all");
   const [owner, setOwner] = useState<string>("all");
   const [starredOnly, setStarredOnly] = useState(false);
   const [active, setActive] = useState<DrawingItem | null>(null);
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
+  const [folderName, setFolderName] = useState("");
 
   const owners = useMemo(
-    () => Array.from(new Set(DRAWING_ITEMS.map((d) => d.owner))),
-    [],
+    () => Array.from(new Set(drawings.map((d) => d.owner))),
+    [drawings],
   );
 
   const items = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return DRAWING_ITEMS.filter((d) => {
+    return drawings.filter((d) => {
       if (q && !`${d.name} ${d.owner}`.toLowerCase().includes(q)) return false;
       if (kind !== "all" && d.kind !== kind) return false;
       if (owner !== "all" && d.owner !== owner) return false;
       if (starredOnly && !d.starred) return false;
       return true;
     });
-  }, [query, kind, owner, starredOnly]);
+  }, [drawings, query, kind, owner, starredOnly]);
+
+  const handleCreateFolder = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const name = folderName.trim() || `New Folder ${drawings.filter((d) => d.kind === "folder").length + 1}`;
+    const newFolder: DrawingItem = {
+      id: `folder-${Date.now()}`,
+      name,
+      kind: "folder",
+      owner: user?.name ?? "Customer",
+      modified: "Just now",
+      pins: 0,
+      size: "0 B",
+      starred: false,
+    };
+    setDrawings((prev) => [newFolder, ...prev]);
+    toast.success(`Created folder "${name}"`);
+    setFolderName("");
+    setNewFolderOpen(false);
+  };
 
   const filterActive = kind !== "all" || owner !== "all" || starredOnly;
 
@@ -57,7 +84,7 @@ export function MyDrawingsView() {
         </div>
         <div className="text-xs text-muted-foreground">
           Showing <span className="font-semibold text-foreground">{items.length}</span> of{" "}
-          <span className="font-semibold text-foreground">{DRAWING_ITEMS.length}</span> items
+          <span className="font-semibold text-foreground">{drawings.length}</span> items
         </div>
       </div>
 
@@ -102,7 +129,7 @@ export function MyDrawingsView() {
           size="sm"
           className="gap-1.5"
           data-hms-context="my-drawings-new-button"
-          onClick={() => toast.success("New folder created in My Drawings")}
+          onClick={() => setNewFolderOpen(true)}
         >
           <Plus className="size-3.5" /> New
         </Button>
@@ -182,6 +209,36 @@ export function MyDrawingsView() {
           ))}
         </div>
       )}
+
+      {/* New Folder Dialog */}
+      <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base">New Folder</DialogTitle>
+            <DialogDescription>
+              Create a new folder in My Drawings to organize your plans.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateFolder} className="space-y-4 mt-2">
+            <div className="space-y-2">
+              <Label htmlFor="folder-name">Folder Name</Label>
+              <Input
+                id="folder-name"
+                placeholder="e.g. Building C - Structural"
+                value={folderName}
+                onChange={(e) => setFolderName(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setNewFolderOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Create Folder</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!active} onOpenChange={(o) => !o && setActive(null)}>
         <DialogContent className="max-w-md">

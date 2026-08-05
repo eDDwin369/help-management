@@ -767,7 +767,13 @@ export function HmsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated || typeof window === "undefined") return;
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      const safeArticles = state.articles.map((a) => {
+        if (a.contentUrl && a.contentUrl.startsWith("data:") && a.contentUrl.length > 200000) {
+          return { ...a, contentUrl: a.contentUrl.slice(0, 500) };
+        }
+        return a;
+      });
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, articles: safeArticles }));
     } catch {
       /* storage full or unavailable — non fatal */
     }

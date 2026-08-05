@@ -18,7 +18,7 @@ export const SECTION_LABELS: Record<string, string> = {
   "section-site-recordings": "Site Recordings",
   "section-tickets": "My Tickets",
   "section-admin-overview": "Dashboard",
-  "section-admin-content": "Content Library",
+  "section-admin-content": "Approvals",
   "section-admin-coverage": "Areas Without Help",
   "section-workspace": "Workspace",
 };
@@ -32,7 +32,7 @@ export const CONTEXT_LABELS: Record<string, string> = {
   "app-tab-site-patrol": "My Site Patrol",
   "app-tab-site-recordings": "Site Recordings",
   "admin-overview-tab": "Dashboard",
-  "admin-content-library-tab": "Content Library",
+  "admin-content-library-tab": "Approvals",
   "admin-coverage-tab": "Areas Without Help",
 
   // Site Recordings
