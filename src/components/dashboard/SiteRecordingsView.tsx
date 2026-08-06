@@ -178,7 +178,7 @@ export function SiteRecordingsView() {
                 <tr
                   key={r.id}
                   className="hover:bg-muted/20 cursor-pointer"
-                  data-hms-context="site-recordings-row"
+                  data-hms-context={`Site Recordings › ${r.name}`}
                   onClick={() => setActive(r)}
                 >
                   <td className="px-4 py-3">
@@ -225,7 +225,7 @@ export function SiteRecordingsView() {
           {rows.map((r) => (
             <button
               key={r.id}
-              data-hms-context="site-recordings-row"
+              data-hms-context={`Site Recordings › ${r.name}`}
               onClick={() => setActive(r)}
               className="text-left border rounded-xl overflow-hidden hover:shadow-md transition-shadow bg-card"
             >
@@ -246,18 +246,21 @@ export function SiteRecordingsView() {
         </div>
       )}
 
-      <Dialog open={!!active} onOpenChange={(o) => !o && setActive(null)}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
+      <Dialog modal={false} open={!!active} onOpenChange={(o) => !o && setActive(null)}>
+        <DialogContent
+          data-hms-context={`Site Recordings › ${active?.name || "Video Item"}`}
+          className="max-w-[820px] w-full h-[620px] max-h-[90vh] flex flex-col justify-between p-6"
+        >
+          <DialogHeader className="shrink-0">
             <DialogTitle className="text-base break-all">{active?.name}</DialogTitle>
             <DialogDescription>
               Session {active?.session} · {active?.pinLabel} · {active?.res}
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-lg bg-muted h-44 flex items-center justify-center">
-            <Video className="size-8 text-muted-foreground" />
+          <div className="flex-1 min-h-0 rounded-lg bg-muted flex items-center justify-center my-3">
+            <Video className="size-12 text-muted-foreground" />
           </div>
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+          <dl className="shrink-0 grid grid-cols-2 gap-x-6 gap-y-3 text-sm pt-3 border-t border-border">
             <Detail label="Captured" value={active?.dt} />
             <Detail label="Duration" value={active?.dur} />
             <Detail label="Session started" value={active?.started} />

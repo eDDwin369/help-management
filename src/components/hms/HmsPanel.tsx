@@ -31,6 +31,7 @@ import {
   ArrowUp,
   Sparkles,
   Headphones,
+  PlusCircle,
 } from "lucide-react";
 import {
   useHmsStore,
@@ -645,17 +646,19 @@ function PrimaryBtn({
   onClick,
   disabled,
   className = "",
+  style,
 }: {
   children: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
   className?: string;
+  style?: React.CSSProperties;
 }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex-1 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap px-4 shrink-0 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 cursor-pointer ${className}`}
       style={{
         height: 32,
         backgroundColor: NAVY,
@@ -663,6 +666,7 @@ function PrimaryBtn({
         borderRadius: 10,
         fontSize: 12,
         fontWeight: 500,
+        ...style,
       }}
     >
       {children}
@@ -684,7 +688,7 @@ function OutlineBtn({
   return (
     <button
       onClick={onClick}
-      className={`flex-1 flex items-center justify-center gap-1.5 ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap px-3 transition-all hover:bg-gray-50 active:scale-95 cursor-pointer shrink-0 ${className}`}
       style={{
         height: 32,
         backgroundColor: "white",
@@ -704,7 +708,7 @@ function OutlineBtn({
 /** Single, consistent Back control used by every sub-view footer. */
 function BackBtn({ onClick }: { onClick?: () => void }) {
   return (
-    <OutlineBtn onClick={onClick} className="hms-back">
+    <OutlineBtn onClick={onClick} className="hms-back shrink-0">
       <ChevronLeft style={{ width: 12, height: 12 }} /> Back
     </OutlineBtn>
   );
@@ -967,43 +971,32 @@ function ListView({
         )}
       </div>
 
-      {role === "customer" ? (
-        <CustomerBottomBar
-          onSendAiPrompt={(prompt) => goTo({ name: "ai-chat", initialPrompt: prompt })}
-          onContact={onContact}
-          onMyRequests={() => goTo({ name: "requests" })}
-        />
-      ) : (
-        <BtnRow>
-          {role === "admin" ? (
-            <>
-              <PrimaryBtn onClick={onAdd}>+ Add Help</PrimaryBtn>
-              <OutlineBtn onClick={onContentLibrary}>
-                <Library style={{ width: 12, height: 12 }} /> Approvals
-              </OutlineBtn>
-            </>
-          ) : (
-            <>
-              <PrimaryBtn onClick={onAdd}>+ Add Help</PrimaryBtn>
-              <OutlineBtn onClick={onContentLibrary}>
-                <Library style={{ width: 12, height: 12 }} /> My Approvals
-              </OutlineBtn>
-            </>
-          )}
-        </BtnRow>
-      )}
+      <HmsBottomBar
+        role={role}
+        onSendAiPrompt={(prompt) => goTo({ name: "ai-chat", initialPrompt: prompt })}
+        onContact={onContact}
+        onAdd={onAdd}
+        onMyRequests={() => goTo({ name: "requests" })}
+        onContentLibrary={onContentLibrary}
+      />
     </>
   );
 }
 
-function CustomerBottomBar({
+function HmsBottomBar({
+  role,
   onSendAiPrompt,
   onContact,
+  onAdd,
   onMyRequests,
+  onContentLibrary,
 }: {
+  role: UserRole;
   onSendAiPrompt: (prompt: string) => void;
   onContact: () => void;
+  onAdd: () => void;
   onMyRequests: () => void;
+  onContentLibrary: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [text, setText] = useState("");
@@ -1043,6 +1036,8 @@ function CustomerBottomBar({
       setTimeout(() => inputRef.current?.focus(), 120);
     }
   };
+
+  const isCustomer = role === "customer";
 
   return (
     <div className="shrink-0 p-3 bg-white border-t border-gray-100 flex flex-col gap-2 relative">
@@ -1188,27 +1183,62 @@ function CustomerBottomBar({
             />
           </button>
 
-          <button
-            type="button"
-            onClick={onContact}
-            title="Contact support"
-            className="size-9 rounded-full flex items-center justify-center bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-orange-50/80 border border-pink-100/80 hover:border-pink-300 transition-all duration-200 shadow-sm hover:shadow hover:scale-105 active:scale-95"
-          >
+          {isCustomer ? (
+            <button
+              type="button"
+              onClick={onContact}
+              title="Contact support"
+              className="size-9 rounded-full flex items-center justify-center bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-orange-50/80 border border-pink-100/80 hover:border-pink-300 transition-all duration-200 shadow-sm hover:shadow hover:scale-105 active:scale-95"
+            >
               <Headphones
                 className="size-4.5 stroke-[2.2]"
                 style={{ stroke: "url(#hms-chat-grad)" }}
               />
-          </button>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onAdd}
+              title="Add Help Article"
+              className="size-9 rounded-full flex items-center justify-center bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-orange-50/80 border border-pink-100/80 hover:border-pink-300 transition-all duration-200 shadow-sm hover:shadow hover:scale-105 active:scale-95"
+            >
+              <PlusCircle
+                className="size-4.5 stroke-[2.2]"
+                style={{ stroke: "url(#hms-chat-grad)" }}
+              />
+            </button>
+          )}
         </div>
       </form>
 
-      <button
-        type="button"
-        onClick={onMyRequests}
-        className="w-full text-center text-[11px] text-gray-500 hover:text-gray-800 hover:underline pt-0.5"
-      >
-        My requests
-      </button>
+      {isCustomer ? (
+        <button
+          type="button"
+          onClick={onMyRequests}
+          className="w-full text-center text-[11px] text-gray-500 hover:text-gray-800 hover:underline pt-0.5"
+        >
+          My requests
+        </button>
+      ) : (
+        <div className="flex items-center justify-center gap-3 pt-0.5 text-[11px] text-gray-500">
+          <button
+            type="button"
+            onClick={onContentLibrary}
+            className="hover:text-gray-800 hover:underline flex items-center gap-1 font-medium text-purple-700"
+          >
+            <Library className="size-3" />
+            {role === "admin" ? "Approvals" : "My Approvals"}
+          </button>
+          <span>•</span>
+          <button
+            type="button"
+            onClick={onMyRequests}
+            className="hover:text-gray-800 hover:underline"
+          >
+            My requests
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1217,14 +1247,22 @@ function CustomerBottomBar({
 
 function AiChatView({
   initialPrompt,
+  role,
   onBack,
   onOpenArticle,
   onContact,
+  onAdd,
+  onMyRequests,
+  onContentLibrary,
 }: {
   initialPrompt?: string;
+  role: UserRole;
   onBack: () => void;
   onOpenArticle: (id: string) => void;
   onContact: () => void;
+  onAdd: () => void;
+  onMyRequests: () => void;
+  onContentLibrary: () => void;
 }) {
   const { state, context } = useHmsStore();
   const [messages, setMessages] = useState<
@@ -1233,12 +1271,20 @@ function AiChatView({
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const sentInitialRef = useRef<string | null>(null);
 
   const contextTitle = context.split(" › ")[0] || "OomniEye Digital Twin";
+  const videoName = context.includes(" › ")
+    ? context.split(" › ").slice(1).join(" › ")
+    : context;
+  const isVideoContext =
+    context.toLowerCase().includes(".mp4") ||
+    context.toLowerCase().includes("recording") ||
+    context.toLowerCase().includes("site recordings");
 
   const handleSend = (promptText: string) => {
     if (!promptText.trim()) return;
-    const userMsg = { id: `u-${Date.now()}`, sender: "user" as const, text: promptText.trim() };
+    const userMsg = { id: `u-${Date.now()}-${Math.random()}`, sender: "user" as const, text: promptText.trim() };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setIsTyping(true);
@@ -1254,14 +1300,47 @@ function AiChatView({
       );
 
       let aiText = "Here is what I found in OomniEye Help Articles to answer your question:";
-      if (matched.length === 0) {
-        aiText = `I couldn't find an exact article matching "${promptText}", but I am trained on OomniEye Digital Twin features. You can contact support or browse recommended topics below.`;
+      if (query.includes("timeline") || query.includes("events") || query.includes("timestamp")) {
+        aiText = `⏱️ Timestamp Breakdown & Key Events (${videoName}):\n\n` +
+          `• 0:00 - 0:01: Video stream initialized at KL-Ar-L2 zone (Session 2).\n` +
+          `• 0:01 - 0:03: Motion sensor auto-detects site patrol technician entry.\n` +
+          `• 0:03 - 0:05: Verification complete; session recording saved & archived.`;
+      } else if (query.includes("technical") || query.includes("specs") || query.includes("resolution")) {
+        aiText = `⚙️ Technical Metadata & Resolution (${videoName}):\n\n` +
+          `• File Name: ${videoName}\n` +
+          `• Resolution: 1920x960 (HD Wide-angle Stream)\n` +
+          `• Captured Date: May 1, 2026, 07:36 PM\n` +
+          `• Session Duration: 5 sec · Session #2 (KL-Ar-L2)\n` +
+          `• Session Window: Started May 1, 6:05 PM — Closed May 7, 7:52 PM`;
+      } else if (query.includes("summarize") || query.includes("summary")) {
+        if (isVideoContext) {
+          aiText = `🎥 Executive Video Summary for ${videoName}:\n\n` +
+            `• Overview: High-resolution 1920x960 site recording captured at KL-Ar-L2 (Session 2).\n` +
+            `• Duration & Size: 5 seconds playback duration · 0.33 MB file size.\n` +
+            `• Key Highlight: Automatic motion tracking active; site patrol check-in confirmed at Level 2.\n` +
+            `• Recommended Action: Review timestamp breakdown below or export raw MP4 video log.`;
+        } else {
+          aiText = `📊 Executive Manager Summary for ${contextTitle}:\n\n` +
+            `• Context & Scope: Real-time operational surveillance, digital twin tracking, and audit logging for ${contextTitle}.\n` +
+            `• Session Activity: 14 active camera logs tracked across key facility sectors with instant scrubbing.\n` +
+            `• Content Status: 12 approved & archived resources live, 2 items awaiting superadmin review.\n` +
+            `• Recommended Action: Review pending items in Approvals or export high-definition playback recordings below.`;
+        }
+      } else if (query.includes("recommend") || query.includes("content")) {
+        aiText = `💡 Recommended Manager Resources for ${contextTitle}:\n\n` +
+          `• Operational Workflow Guide for ${contextTitle}\n` +
+          `• Video Playback & Incident Scrubbing Manual\n` +
+          `• Superadmin Audit & Compliance Workflows`;
+      } else if (matched.length === 0) {
+        aiText = `📌 Response Summary for "${promptText}":\n\n` +
+          `• Overview: ${contextTitle} provides real-time digital twin monitoring and audit logging.\n` +
+          `• Help Articles: Browse related guides below or use the search bar to locate specific operational procedures.`;
       }
 
       setMessages((prev) => [
         ...prev,
         {
-          id: `ai-${Date.now()}`,
+          id: `ai-${Date.now()}-${Math.random()}`,
           sender: "ai" as const,
           text: aiText,
           articles: matched.length > 0 ? matched.slice(0, 3) : state.articles.slice(0, 2),
@@ -1272,10 +1351,11 @@ function AiChatView({
   };
 
   useEffect(() => {
-    if (initialPrompt) {
+    if (initialPrompt && sentInitialRef.current !== initialPrompt) {
+      sentInitialRef.current = initialPrompt;
       handleSend(initialPrompt);
     }
-  }, []);
+  }, [initialPrompt]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1295,12 +1375,35 @@ function AiChatView({
 
           {/* Clickable Quick Chips stacked on the right */}
           <div className="flex flex-col items-end space-y-2 pt-1">
-            <button
-              onClick={() => handleSend(`Summarize ${contextTitle}`)}
-              className="px-4 py-2 rounded-full border border-gray-300 bg-white hover:bg-purple-50 hover:border-purple-300 text-xs font-medium text-gray-800 transition-all shadow-xs hover:shadow active:scale-95 text-right cursor-pointer"
-            >
-              Summarize {contextTitle}
-            </button>
+            {isVideoContext ? (
+              <>
+                <button
+                  onClick={() => handleSend(`Summarize ${videoName}`)}
+                  className="px-4 py-2 rounded-full border border-purple-300 bg-purple-50 hover:bg-purple-100 text-xs font-medium text-purple-900 transition-all shadow-xs hover:shadow active:scale-95 text-right cursor-pointer"
+                >
+                  Summarize this video
+                </button>
+                <button
+                  onClick={() => handleSend("Video Timeline & Key Events")}
+                  className="px-4 py-2 rounded-full border border-gray-300 bg-white hover:bg-purple-50 hover:border-purple-300 text-xs font-medium text-gray-800 transition-all shadow-xs hover:shadow active:scale-95 text-right cursor-pointer"
+                >
+                  Video Timeline & Key Events
+                </button>
+                <button
+                  onClick={() => handleSend("Technical Specs & Metadata")}
+                  className="px-4 py-2 rounded-full border border-gray-300 bg-white hover:bg-purple-50 hover:border-purple-300 text-xs font-medium text-gray-800 transition-all shadow-xs hover:shadow active:scale-95 text-right cursor-pointer"
+                >
+                  Technical Specs & Metadata
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => handleSend(`Summarize ${contextTitle}`)}
+                className="px-4 py-2 rounded-full border border-gray-300 bg-white hover:bg-purple-50 hover:border-purple-300 text-xs font-medium text-gray-800 transition-all shadow-xs hover:shadow active:scale-95 text-right cursor-pointer"
+              >
+                Summarize {contextTitle}
+              </button>
+            )}
 
             <button
               onClick={() => handleSend("Recommend related content")}
@@ -1343,7 +1446,7 @@ function AiChatView({
                   <span>HMS AI Assistant</span>
                 </div>
               )}
-              <p>{m.text}</p>
+              <p className="whitespace-pre-line">{m.text}</p>
 
               {m.articles && m.articles.length > 0 && (
                 <div className="mt-2.5 pt-2 border-t border-gray-200 space-y-1.5">
@@ -1375,31 +1478,14 @@ function AiChatView({
         <div ref={bottomRef} />
       </div>
 
-      {/* ChatGPT Style Message Sender */}
-      <div className="p-3 bg-white border-t border-gray-100">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSend(input);
-          }}
-          className="flex items-center gap-2 bg-gray-50 border border-gray-200 focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-500/20 rounded-2xl px-3 py-1.5 transition-all"
-        >
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask AI anything..."
-            className="flex-1 bg-transparent text-xs text-gray-800 placeholder-gray-400 focus:outline-none"
-          />
-          <button
-            type="submit"
-            disabled={!input.trim()}
-            className="size-7 rounded-full flex items-center justify-center text-white bg-gradient-to-r from-purple-600 to-indigo-600 disabled:opacity-40 disabled:scale-100 hover:scale-105 active:scale-95 transition-all shrink-0"
-          >
-            <ArrowUp className="size-3.5 stroke-[2.8]" />
-          </button>
-        </form>
-      </div>
+      <HmsBottomBar
+        role={role}
+        onSendAiPrompt={handleSend}
+        onContact={onContact}
+        onAdd={onAdd}
+        onMyRequests={onMyRequests}
+        onContentLibrary={onContentLibrary}
+      />
     </div>
   );
 }
@@ -1485,8 +1571,9 @@ function DetailView({
   const hasUrl = !!article.contentUrl;
 
   return (
-    <>
-      <div className="flex-1 overflow-y-auto hms-scroll">
+    <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-white">
+      {/* Independently Scrollable Media/Image Area */}
+      <div className="flex-1 min-h-0 overflow-y-auto hms-scroll bg-gray-50 flex items-center justify-center p-2">
         {isVideo && mediaError && (
           <MediaError kind="video" url={article.contentUrl} onRetry={retryMedia} />
         )}
@@ -1499,44 +1586,44 @@ function DetailView({
               aria-label={`Video: ${article.title}`}
               onError={() => onMediaError("video")}
               key={`${article.contentUrl!}-${mediaKey}`}
-              style={{ width: "100%", height: 196, background: "#1a1a1a", display: "block" }}
+              className="max-w-full max-h-full object-contain rounded"
+              style={{ width: "100%", height: "100%", minHeight: 280, background: "#1a1a1a" }}
             >
-              {/* WebM first for browsers without H.264 support, MP4 as fallback. */}
               {article.contentUrl!.endsWith(".mp4") && (
                 <source src={article.contentUrl!.replace(/\.mp4$/, ".webm")} type="video/webm" />
               )}
               <source src={article.contentUrl!} />
             </video>
-
           ) : (
-            <div className="flex flex-col" style={{ backgroundColor: "#1a1a1a" }}>
-              <div className="flex items-center justify-center" style={{ height: 164, position: "relative" }}>
+            <div className="flex flex-col w-full" style={{ backgroundColor: "#1a1a1a" }}>
+              <div className="flex items-center justify-center" style={{ height: 260, position: "relative" }}>
                 <button
                   className="flex items-center justify-center rounded-full"
-                  style={{ width: 40, height: 40, backgroundColor: "rgba(255,255,255,0.15)", color: "white" }}
+                  style={{ width: 48, height: 48, backgroundColor: "rgba(255,255,255,0.15)", color: "white" }}
                 >
-                  <Play style={{ width: 16, height: 16 }} fill="white" />
+                  <Play style={{ width: 20, height: 20 }} fill="white" />
                 </button>
               </div>
-              <div className="flex items-center" style={{ padding: "0 10px", height: 32, gap: 8, color: "rgba(255,255,255,0.8)", fontSize: 10, background: "rgba(0,0,0,0.6)" }}>
-                <Play style={{ width: 10, height: 10 }} fill="white" />
+              <div className="flex items-center" style={{ padding: "0 12px", height: 36, gap: 8, color: "rgba(255,255,255,0.8)", fontSize: 11, background: "rgba(0,0,0,0.6)" }}>
+                <Play style={{ width: 12, height: 12 }} fill="white" />
                 <span>0:00</span>
-                <div className="flex-1 rounded-full" style={{ height: 3, backgroundColor: "rgba(255,255,255,0.25)" }}>
-                  <div className="rounded-full" style={{ width: "28%", height: 3, backgroundColor: "white" }} />
+                <div className="flex-1 rounded-full" style={{ height: 4, backgroundColor: "rgba(255,255,255,0.25)" }}>
+                  <div className="rounded-full" style={{ width: "28%", height: 4, backgroundColor: "white" }} />
                 </div>
                 <span>4:28</span>
-                <Volume2 style={{ width: 12, height: 12 }} />
-                <Maximize2 style={{ width: 12, height: 12 }} />
+                <Volume2 style={{ width: 14, height: 14 }} />
+                <Maximize2 style={{ width: 14, height: 14 }} />
               </div>
             </div>
           )
         )}
+
         {isImage && mediaError && (
           <MediaError kind="image" url={article.contentUrl} onRetry={retryMedia} />
         )}
         {isImage && !mediaError && (
           hasUrl ? (
-            <div style={{ width: "100%", background: "#F3F4F6" }}>
+            <div className="w-full h-full flex items-center justify-center">
               <img
                 key={mediaKey}
                 loading="lazy"
@@ -1544,17 +1631,18 @@ function DetailView({
                 onError={() => onMediaError("image")}
                 src={article.contentUrl!}
                 alt={article.title}
-                style={{ width: "100%", maxHeight: 200, objectFit: "contain", display: "block" }}
+                className="max-w-full max-h-full object-contain block rounded shadow-xs"
               />
             </div>
           ) : (
-            <div className="flex items-center justify-center" style={{ width: "100%", height: 160, background: "#F3F4F6" }}>
-              <ImageIcon style={{ width: 40, height: 40, color: "#D1D5DB" }} />
+            <div className="flex items-center justify-center w-full h-[240px] bg-gray-100 rounded">
+              <ImageIcon style={{ width: 56, height: 56, color: "#D1D5DB" }} />
             </div>
           )
         )}
+
         {isPdf && (
-          <div>
+          <div className="w-full h-full">
             {hasUrl ? (
               mediaError ? (
                 <MediaError kind="document" url={article.contentUrl} onRetry={retryMedia} />
@@ -1565,7 +1653,7 @@ function DetailView({
                   onError={() => onMediaError("pdf")}
                   src={`${article.contentUrl!}#view=FitH&toolbar=0&navpanes=0&scrollbar=0`}
                   title={article.title}
-                  style={{ width: "100%", height: 300, border: "none", background: "#F3F4F6", display: "block" }}
+                  className="w-full h-full min-h-[340px] border-none rounded bg-gray-100 block"
                 />
               )
             ) : (
@@ -1578,8 +1666,9 @@ function DetailView({
             )}
           </div>
         )}
+
         {article.contentType === "text" && (
-          <div style={{ padding: "12px 16px", fontSize: 12, color: "#374151", lineHeight: 1.7 }}>
+          <div style={{ padding: "12px 16px", fontSize: 12, color: "#374151", lineHeight: 1.7, width: "100%" }}>
             <p style={{ marginBottom: 10 }}>{article.description}</p>
             {(article.body ?? []).map((section) => (
               <div key={section.heading} style={{ marginBottom: 12 }}>
@@ -1613,19 +1702,19 @@ function DetailView({
             ))}
           </div>
         )}
+      </div>
 
-
-
+      {/* Fixed Metadata Panel */}
+      <div className="shrink-0 bg-white border-t border-gray-100 p-3 space-y-0.5">
         {role !== "customer" && article.approvalStatus !== "approved" && (
           <div
-            className="flex items-start"
+            className="flex items-start mb-1.5"
             style={{
-              margin: "12px 12px 0",
-              padding: "8px 10px",
+              padding: "6px 8px",
               gap: 7,
               backgroundColor: "#FFFBEB",
               border: "0.8px solid #FDE68A",
-              borderRadius: 8,
+              borderRadius: 6,
             }}
           >
             <AlertTriangle style={{ width: 13, height: 13, color: "#B45309", marginTop: 1 }} />
@@ -1636,147 +1725,123 @@ function DetailView({
           </div>
         )}
 
-        <div style={{ padding: "16px" }}>
-          <MetaRow label="Title" value={article.title} />
-          <MetaRow label="Description" value={article.description} />
-          <MetaRow label="Tags" value={article.tags.join(" · ")} />
-          <MetaRow
-            label={isVideo ? "Size / Format" : "Format"}
-            value={
-              isVideo
-                ? `${formatBytes(article.sizeBytes)} · MP4 · ${formatDate(article.createdAt)}`
-                : article.contentType === "pdf"
-                  ? `${article.pages ? `${article.pages} pages · ` : ""}PDF · ${formatDate(article.createdAt)}`
-                  : article.contentType === "image"
-                    ? `Image · ${formatDate(article.createdAt)}`
-                    : `Article · ${formatDate(article.createdAt)}`
-            }
-          />
+        <MetaRow label="Title" value={article.title} />
+        <MetaRow label="Description" value={article.description} />
+        <MetaRow label="Tags" value={article.tags.join(" · ")} />
+        <MetaRow
+          label={isVideo ? "Size / Format" : "Format"}
+          value={
+            isVideo
+              ? `${formatBytes(article.sizeBytes)} · MP4 · ${formatDate(article.createdAt)}`
+              : article.contentType === "pdf"
+                ? `${article.pages ? `${article.pages} pages · ` : ""}PDF · ${formatDate(article.createdAt)}`
+                : article.contentType === "image"
+                  ? `Image · ${formatDate(article.createdAt)}`
+                  : `Article · ${formatDate(article.createdAt)}`
+          }
+        />
 
-          {role !== "customer" && article.approvalStatus === "approved" && article.approvedBy && (
-            <div className="flex" style={{ padding: "6px 0" }}>
-              <div style={{ width: 90, fontSize: 10, color: "#9CA3AF", textTransform: "uppercase", fontWeight: 600 }}>
-                Approval
-              </div>
-              <div style={{ fontSize: 12, color: "#22C55E" }}>
-                ✓ Approved by {article.approvedBy} · {formatDate(article.approvedAt!)}
-              </div>
+        {role !== "customer" && article.approvalStatus === "approved" && article.approvedBy && (
+          <div className="flex" style={{ padding: "4px 0" }}>
+            <div style={{ width: 90, fontSize: 10, color: "#9CA3AF", textTransform: "uppercase", fontWeight: 600 }}>
+              Approval
             </div>
-          )}
-          {role !== "customer" && (
-            <>
-              <MetaRow
-                label="Added By"
-                value={`${article.authorName} · ${new Date(article.createdAt).toLocaleString(
-                  "en-GB",
-                  { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" },
-                )}`}
-              />
-              <MetaRow
-                label="Modified"
-                value={new Date(article.updatedAt).toLocaleString("en-GB", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              />
-            </>
-          )}
-        </div>
+            <div style={{ fontSize: 11, color: "#22C55E", fontWeight: 500 }}>
+              ✓ Approved by {article.approvedBy} · {formatDate(article.approvedAt!)}
+            </div>
+          </div>
+        )}
       </div>
-      {role === "customer" ? (
-        <BtnRow>
+
+      {/* Fixed Footer Buttons */}
+      <div className="shrink-0 bg-white border-t border-gray-100 p-2.5 flex flex-col gap-1.5">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <BackBtn onClick={onBack} />
-        </BtnRow>
-      ) : (
-        <div className="shrink-0" style={{ borderTop: "0.8px solid #F3F4F6" }}>
-          <div className="flex" style={{ padding: "9px 12px", gap: 8 }}>
-            {role === "admin" ? (
-              <>
-                {article.approvalStatus !== "approved" && (
-                  <OutlineBtn
-                    onClick={() => {
-                      approveArticle(article.id);
-                      toast.success("✓ Approved");
-                    }}
-                    style={{ border: "0.8px solid #BBF7D0", color: "#22C55E" }}
-                  >
-                    <Check style={{ width: 12, height: 12 }} /> Approve
-                  </OutlineBtn>
-                )}
-                {article.approvalStatus !== "unapproved" && (
-                  <OutlineBtn
-                    onClick={() => {
-                      unapproveArticle(article.id);
-                      toast.success("Rejected");
-                    }}
-                    style={{ border: "0.8px solid #FECDD3", color: "#E11D48" }}
-                  >
-                    <XCircle style={{ width: 12, height: 12 }} /> Reject
-                  </OutlineBtn>
-                )}
-              </>
-            ) : (
-              <OutlineBtn onClick={() => goTo({ name: "add", editId: article.id })}>
-                <Pencil style={{ width: 12, height: 12 }} /> Edit
-              </OutlineBtn>
-            )}
-            <OutlineBtn
-              onClick={() => {
-                archiveArticle(article.id);
-                toast.success(article.archiveStatus === "active" ? "Archived" : "Unarchived");
-              }}
-            >
-              <ArchiveIcon style={{ width: 12, height: 12 }} />{" "}
-              {article.archiveStatus === "active" ? "Archive" : "Unarchive"}
-            </OutlineBtn>
-            {role === "admin" && (
+          {role !== "customer" && (
+            <div className="flex items-center gap-2 flex-wrap ml-auto">
+              {role === "admin" ? (
+                <>
+                  {article.approvalStatus !== "approved" && (
+                    <OutlineBtn
+                      onClick={() => {
+                        approveArticle(article.id);
+                        toast.success("✓ Approved");
+                      }}
+                      style={{ border: "0.8px solid #BBF7D0", color: "#22C55E" }}
+                    >
+                      <Check style={{ width: 12, height: 12 }} /> Approve
+                    </OutlineBtn>
+                  )}
+                  {article.approvalStatus !== "unapproved" && (
+                    <OutlineBtn
+                      onClick={() => {
+                        unapproveArticle(article.id);
+                        toast.success("Rejected");
+                      }}
+                      style={{ border: "0.8px solid #FECDD3", color: "#E11D48" }}
+                    >
+                      <XCircle style={{ width: 12, height: 12 }} /> Reject
+                    </OutlineBtn>
+                  )}
+                </>
+              ) : (
+                <OutlineBtn onClick={() => goTo({ name: "add", editId: article.id })}>
+                  <Pencil style={{ width: 12, height: 12 }} /> Edit
+                </OutlineBtn>
+              )}
               <OutlineBtn
-                onClick={() => setConfirmDelete(true)}
-                style={{ border: "0.8px solid #FECACA", color: "#EF4444" }}
+                onClick={() => {
+                  archiveArticle(article.id);
+                  toast.success(article.archiveStatus === "active" ? "Archived" : "Unarchived");
+                }}
               >
-                <Trash2 style={{ width: 12, height: 12 }} /> Delete
+                <ArchiveIcon style={{ width: 12, height: 12 }} />{" "}
+                {article.archiveStatus === "active" ? "Archive" : "Unarchive"}
               </OutlineBtn>
-            )}
-          </div>
-          {confirmDelete && (
-            <div
-              className="flex items-center justify-between"
-              style={{
-                padding: "8px 12px",
-                backgroundColor: "#FEF2F2",
-                borderTop: "0.8px solid #FECACA",
-                fontSize: 11,
-                color: "#991B1B",
-              }}
-            >
-              <span>Delete this article?</span>
-              <div className="flex gap-2">
-                <button onClick={() => setConfirmDelete(false)} className="underline">
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    deleteArticle(article.id);
-                    toast.success("Deleted");
-                    onBack();
-                  }}
-                  className="font-semibold"
-                  style={{ color: "#EF4444" }}
+              {role === "admin" && (
+                <OutlineBtn
+                  onClick={() => setConfirmDelete(true)}
+                  style={{ border: "0.8px solid #FECACA", color: "#EF4444" }}
                 >
-                  Delete
-                </button>
-              </div>
+                  <Trash2 style={{ width: 12, height: 12 }} /> Delete
+                </OutlineBtn>
+              )}
             </div>
           )}
-          <div style={{ padding: "0 12px 9px" }}>
-            <BackBtn onClick={onBack} />
-          </div>
         </div>
-      )}
-    </>
+        {confirmDelete && (
+          <div
+            className="flex items-center justify-between"
+            style={{
+              padding: "8px 12px",
+              backgroundColor: "#FEF2F2",
+              borderTop: "0.8px solid #FECACA",
+              fontSize: 11,
+              color: "#991B1B",
+              borderRadius: 6,
+            }}
+          >
+            <span>Delete this article?</span>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDelete(false)} className="underline">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  deleteArticle(article.id);
+                  toast.success("Deleted");
+                  onBack();
+                }}
+                className="font-semibold"
+                style={{ color: "#EF4444" }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -2778,12 +2843,12 @@ function AddHelpView({
         </div>
       </div>
 
-      <BtnRow>
+      <div className="shrink-0 p-3 bg-white border-t border-gray-100 flex items-center justify-end gap-2.5">
         <OutlineBtn onClick={onCancel}>Cancel</OutlineBtn>
         <PrimaryBtn onClick={save} disabled={!canSave}>
           {role === "admin" && autoApprove ? "Publish" : "Send Approval"}
         </PrimaryBtn>
-      </BtnRow>
+      </div>
     </>
   );
 }
@@ -2807,11 +2872,17 @@ export function HmsPanel() {
   /** View to return to when leaving the tickets screen — keeps context continuous. */
   const [returnView, setReturnView] = useState<View>({ name: "list" });
 
-  // Reset view when the active context changes (navigation / right-click).
+  // Reset view when active context changes or panel closes.
   useEffect(() => {
     setView({ name: "list" });
     setReturnView({ name: "list" });
   }, [context]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setView({ name: "list" });
+    }
+  }, [isOpen]);
 
   // Deep-link requests from outside the panel (e.g. the admin content library).
   useEffect(() => {
@@ -2863,6 +2934,47 @@ export function HmsPanel() {
   const [size, setSize] = useState({ width: 320, height: 530 });
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
+  const userPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Resize for Preview ("detail") and Add/Edit ("add") while preserving right-click location for normal views
+  useEffect(() => {
+    if (view.name === "detail") {
+      const fixedW = Math.min(820, window.innerWidth - 32);
+      const fixedH = Math.min(620, window.innerHeight - 40);
+      setSize({ width: fixedW, height: fixedH });
+      setPos({
+        x: Math.max(10, Math.floor((window.innerWidth - fixedW) / 2)),
+        y: Math.max(10, Math.floor((window.innerHeight - fixedH) / 2)),
+      });
+    } else if (view.name === "add") {
+      const fixedW = Math.min(560, window.innerWidth - 32);
+      const fixedH = Math.min(480, window.innerHeight - 40);
+      setSize({ width: fixedW, height: fixedH });
+      setPos({
+        x: Math.max(10, Math.floor((window.innerWidth - fixedW) / 2)),
+        y: Math.max(10, Math.floor((window.innerHeight - fixedH) / 2)),
+      });
+    } else {
+      setSize({ width: 320, height: 530 });
+      if (userPosRef.current) {
+        const clampedX = Math.max(10, Math.min(window.innerWidth - 320 - 10, userPosRef.current.x));
+        const clampedY = Math.max(10, Math.min(window.innerHeight - 530 - 10, userPosRef.current.y));
+        setPos({ x: clampedX, y: clampedY });
+      }
+    }
+  }, [view.name]);
+
+  // Reset view and user position reference when the panel closes (delay pos reset until fade-out finishes)
+  useEffect(() => {
+    if (!isOpen) {
+      setView({ name: "list" });
+      userPosRef.current = null;
+      const timer = setTimeout(() => {
+        setPos(null);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   const handleDragStart = useCallback(
     (e: React.MouseEvent) => {
@@ -2878,7 +2990,9 @@ export function HmsPanel() {
         const deltaY = moveEvent.clientY - startY;
         const newX = Math.max(0, Math.min(window.innerWidth - size.width, initialX + deltaX));
         const newY = Math.max(0, Math.min(window.innerHeight - size.height, initialY + deltaY));
-        setPos({ x: newX, y: newY });
+        const newPos = { x: newX, y: newY };
+        userPosRef.current = newPos;
+        setPos(newPos);
       };
 
       const onMouseUp = () => {
@@ -2931,6 +3045,28 @@ export function HmsPanel() {
     if (isOpen) trackHmsEvent("panel_open", { role, contextKey: context });
   }, [isOpen, role, context]);
 
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Global Click-Outside Event Listener to close modal box when user clicks outside
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        closePanel();
+      }
+    };
+
+    const timer = setTimeout(() => {
+      document.addEventListener("mousedown", handleClickOutside);
+    }, 50);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen, closePanel]);
+
   // Global Right-Click Event Listener to position and open HMS modal at right-click mouse location
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
@@ -2940,24 +3076,32 @@ export function HmsPanel() {
         return;
       }
       e.preventDefault();
+      const contextEl = target.closest("[data-hms-context]") as HTMLElement | null;
+      if (contextEl?.dataset.hmsContext) {
+        setContext(contextEl.dataset.hmsContext);
+      }
+      setView({ name: "list" });
       const clampedX = Math.max(10, Math.min(window.innerWidth - size.width - 10, e.clientX - 20));
       const clampedY = Math.max(10, Math.min(window.innerHeight - size.height - 10, e.clientY - 20));
-      setPos({ x: clampedX, y: clampedY });
+      const rightClickPos = { x: clampedX, y: clampedY };
+      userPosRef.current = rightClickPos;
+      setPos(rightClickPos);
       openPanel();
     };
 
     window.addEventListener("contextmenu", handleContextMenu);
     return () => window.removeEventListener("contextmenu", handleContextMenu);
-  }, [openPanel, size.width, size.height]);
+  }, [openPanel, size.width, size.height, setContext]);
 
   return (
     <div
+      ref={panelRef}
       role="dialog"
       aria-modal="false"
       aria-label={`Help Management System — ${crumb}`}
       aria-hidden={!isOpen}
       className={`fixed flex flex-col bg-white ${
-        isDragging || isResizing ? "" : "transition-all duration-200"
+        isDragging || isResizing ? "" : "transition-opacity transition-transform duration-150 ease-out"
       } ${
         isOpen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2 pointer-events-none"
       }`}
@@ -2968,7 +3112,8 @@ export function HmsPanel() {
         bottom: pos ? undefined : 76,
         width: size.width,
         height: size.height,
-        zIndex: 9998,
+        zIndex: 99999,
+        pointerEvents: isOpen ? "auto" : "none",
         borderRadius: 10,
         boxShadow: "0 4px 6px rgba(0,0,0,0.06), 0 10px 28px rgba(0,0,0,0.13)",
         overflow: "hidden",
@@ -3057,9 +3202,16 @@ export function HmsPanel() {
       {view.name === "ai-chat" && (
         <AiChatView
           initialPrompt={view.initialPrompt}
+          role={role}
           onBack={() => setView({ name: "list" })}
           onOpenArticle={(id) => setView({ name: "detail", id })}
           onContact={() => setView({ name: "contact" })}
+          onAdd={() => setView({ name: "add" })}
+          onMyRequests={() => setView({ name: "requests" })}
+          onContentLibrary={() => {
+            closePanel();
+            navigate({ to: "/admin", search: { tab: "content" } });
+          }}
         />
       )}
 
