@@ -378,25 +378,25 @@ function Header({
 function SearchBar({
   value,
   onChange,
-  filterCount,
+  filterCount = 0,
   onToggleFilter,
-  filterOpen,
+  filterOpen = false,
+  placeholder = "Search help articles...",
 }: {
   value: string;
   onChange: (v: string) => void;
-  filterCount: number;
-  onToggleFilter: () => void;
-  filterOpen: boolean;
+  filterCount?: number;
+  onToggleFilter?: () => void;
+  filterOpen?: boolean;
+  placeholder?: string;
 }) {
   const active = filterCount > 0;
   return (
     <div
-      className="flex items-center shrink-0"
+      className="flex items-center shrink-0 bg-white"
       style={{
-        height: 40,
-        backgroundColor: "white",
+        padding: "8px 12px",
         borderBottom: "0.8px solid #F3F4F6",
-        padding: "0 12px",
         gap: 8,
       }}
     >
@@ -409,19 +409,29 @@ function SearchBar({
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Search help articles..."
-          aria-label="Search help articles"
+          placeholder={placeholder}
+          aria-label={placeholder}
           className="w-full outline-none focus-visible:ring-2 focus-visible:ring-[#3B6BF5]"
           style={{
             height: 26,
             backgroundColor: "#F9FAFB",
             border: "0.8px solid #E5E7EB",
             borderRadius: 6,
-            padding: "0 8px 0 26px",
+            padding: value ? "0 24px 0 26px" : "0 8px 0 26px",
             fontSize: 12,
             color: "#374151",
           }}
         />
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none p-0.5 rounded-full hover:bg-gray-200 transition-colors"
+            title="Clear search"
+          >
+            <X className="size-3 stroke-[2]" />
+          </button>
+        )}
       </div>
       <button
         onClick={onToggleFilter}
@@ -530,6 +540,14 @@ function Checkbox({
   );
 }
 
+const DEFAULT_FILTERS: Filters = {
+  types: [],
+  archive: "all",
+  approval: "all",
+};
+
+const ALL_TYPES: ContentType[] = ["video", "pdf", "image", "text"];
+
 function FilterDropdown({
   role,
   filters,
@@ -539,14 +557,22 @@ function FilterDropdown({
   role: UserRole;
   filters: Filters;
   setFilters: (f: Filters) => void;
-  /** Called after any selection so the dropdown can close itself. */
+  /** Called to close the filter dropdown. */
   onSelected: () => void;
 }) {
   const cols = role === "admin" ? 3 : role === "help-admin" ? 2 : 1;
 
   const apply = (f: Filters) => {
     setFilters(f);
-    onSelected();
+    // Keep filter dropdown open while user selects checkboxes
+  };
+
+  const toggleAllTypes = () => {
+    if (filters.types.length === ALL_TYPES.length) {
+      apply({ ...filters, types: [] });
+    } else {
+      apply({ ...filters, types: [...ALL_TYPES] });
+    }
   };
 
   const toggleType = (t: ContentType) => {
@@ -556,69 +582,103 @@ function FilterDropdown({
     apply({ ...filters, types: next });
   };
 
+  const isFiltered =
+    filters.types.length > 0 || filters.archive !== "all" || filters.approval !== "all";
+
+  const isAllTypesChecked =
+    filters.types.length === ALL_TYPES.length;
+
   return (
     <div
-      className="absolute z-10 grid bg-white"
+      className="absolute z-20 flex flex-col bg-white"
       style={{
         top: 4,
         right: 8,
         borderRadius: 8,
         border: "0.8px solid #E5E7EB",
         boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-        gridTemplateColumns: `repeat(${cols}, minmax(96px,1fr))`,
-        width: cols === 3 ? 300 : cols === 2 ? 220 : 140,
+        width: cols === 3 ? 300 : cols === 2 ? 220 : 160,
       }}
     >
-      <div style={{ padding: "10px 12px", borderRight: cols > 1 ? "1px solid #F3F4F6" : "none" }}>
-        <Label>Type</Label>
-        <Checkbox
-          checked={filters.types.length === 0}
-          label="All types"
-          onClick={() => apply({ ...filters, types: [] })}
-        />
-        {TYPE_OPTIONS.map((o) => (
-          <Checkbox
-            key={o.v}
-            checked={filters.types.includes(o.v)}
-            label={o.l}
-            onClick={() => toggleType(o.v)}
-          />
-        ))}
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-gray-100 bg-gray-50/70 rounded-t-lg">
+        <span className="text-[10px] uppercase font-bold tracking-wider text-gray-500">Filter</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => apply(DEFAULT_FILTERS)}
+            className={`text-[10px] font-semibold hover:underline flex items-center gap-0.5 ${
+              isFiltered ? "text-purple-600 hover:text-purple-700" : "text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            Clear all
+          </button>
+          <button
+            type="button"
+            onClick={onSelected}
+            className="text-gray-400 hover:text-gray-600 p-0.5 rounded hover:bg-gray-200 transition-colors"
+            title="Close filter dropdown"
+          >
+            <X className="size-3" />
+          </button>
+        </div>
       </div>
-      {cols >= 2 && (
-        <div style={{ padding: "10px 12px", borderRight: cols > 2 ? "1px solid #F3F4F6" : "none" }}>
-          <Label>Archive</Label>
-          {[
-            { v: "active", l: "Active" },
-            { v: "archived", l: "Archived" },
-            { v: "all", l: "All" },
-          ].map((o) => (
-            <Radio
+      <div
+        className="grid flex-1"
+        style={{
+          gridTemplateColumns: `repeat(${cols}, minmax(96px,1fr))`,
+        }}
+      >
+        <div style={{ padding: "8px 12px", borderRight: cols > 1 ? "1px solid #F3F4F6" : "none" }}>
+          <Label>Type</Label>
+          <Checkbox
+            checked={isAllTypesChecked}
+            label="All types"
+            onClick={toggleAllTypes}
+          />
+          {TYPE_OPTIONS.map((o) => (
+            <Checkbox
               key={o.v}
-              selected={filters.archive === o.v}
+              checked={filters.types.includes(o.v)}
               label={o.l}
-              onClick={() => apply({ ...filters, archive: o.v })}
+              onClick={() => toggleType(o.v)}
             />
           ))}
         </div>
-      )}
-      {cols >= 3 && (
-        <div style={{ padding: "10px 12px" }}>
-          <Label>Approval</Label>
-          {[
-            { v: "approved", l: "Approved" },
-            { v: "pending", l: "Pending" },
-            { v: "all", l: "All" },
-          ].map((o) => (
-            <Radio
-              key={o.v}
-              selected={filters.approval === o.v}
-              label={o.l}
-              onClick={() => apply({ ...filters, approval: o.v })}
-            />
-          ))}
-        </div>
-      )}
+        {cols >= 2 && (
+          <div style={{ padding: "8px 12px", borderRight: cols > 2 ? "1px solid #F3F4F6" : "none" }}>
+            <Label>Archive</Label>
+            {[
+              { v: "active", l: "Active" },
+              { v: "archived", l: "Archived" },
+              { v: "all", l: "All" },
+            ].map((o) => (
+              <Radio
+                key={o.v}
+                selected={filters.archive === o.v}
+                label={o.l}
+                onClick={() => apply({ ...filters, archive: o.v })}
+              />
+            ))}
+          </div>
+        )}
+        {cols >= 3 && (
+          <div style={{ padding: "8px 12px" }}>
+            <Label>Approval</Label>
+            {[
+              { v: "approved", l: "Approved" },
+              { v: "pending", l: "Pending" },
+              { v: "all", l: "All" },
+            ].map((o) => (
+              <Radio
+                key={o.v}
+                selected={filters.approval === o.v}
+                label={o.l}
+                onClick={() => apply({ ...filters, approval: o.v })}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -2302,6 +2362,7 @@ function RequestsView({
         filterCount={status === "all" ? 0 : 1}
         onToggleFilter={() => setFilterOpen((v) => !v)}
         filterOpen={filterOpen}
+        placeholder="Search requests..."
       />
       <div className="relative flex-1 flex flex-col min-h-0">
         {filterOpen && (
@@ -2350,13 +2411,28 @@ function RequestsView({
           </span>
           <span style={{ fontSize: 10, color: "#9CA3AF" }}>{open} open</span>
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto hms-scroll" role="list">
+        <div className="flex-1 min-h-0 overflow-y-auto hms-scroll flex flex-col" role="list">
           {list.length === 0 && (
-            <div
-              className="text-center"
-              style={{ padding: "48px 24px", fontSize: 12, color: "#9CA3AF" }}
-            >
-              No requests match this filter.
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center my-auto space-y-2">
+              <div className="size-11 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 mb-1">
+                <FileText className="size-5 stroke-[1.8]" />
+              </div>
+              <p className="text-xs font-semibold text-gray-900">
+                {search || status !== "all" ? "No matching requests" : "No support requests yet"}
+              </p>
+              <p className="text-[11px] text-gray-500 max-w-[210px] leading-relaxed">
+                {search || status !== "all"
+                  ? "Try clearing your search query or changing status filters."
+                  : "Submit a new support request to get help from our team."}
+              </p>
+              {!search && status === "all" && (
+                <button
+                  onClick={onNew}
+                  className="mt-1 text-xs font-medium text-purple-600 hover:text-purple-700 underline underline-offset-2"
+                >
+                  + Create your first request
+                </button>
+              )}
             </div>
           )}
           {list.map((t) => (
@@ -2391,10 +2467,10 @@ function RequestsView({
           ))}
         </div>
       </div>
-      <BtnRow>
+      <div className="shrink-0 p-3 bg-white border-t border-gray-100 flex items-center justify-between">
         <BackBtn onClick={onBack} />
         <PrimaryBtn onClick={onNew}>+ New Request</PrimaryBtn>
-      </BtnRow>
+      </div>
     </>
   );
 }
@@ -2861,9 +2937,11 @@ export function HmsPanel() {
     openPanel,
     closePanel,
     context,
+    contextKey,
     role,
     state,
     setContext,
+    clearOverride,
     panelRequest,
     consumePanelRequest,
   } = useHmsStore();
@@ -3076,10 +3154,25 @@ export function HmsPanel() {
         return;
       }
       e.preventDefault();
-      const contextEl = target.closest("[data-hms-context]") as HTMLElement | null;
-      if (contextEl?.dataset.hmsContext) {
-        setContext(contextEl.dataset.hmsContext);
+
+      let el: HTMLElement | null = target;
+      let detectedContext: string | null = null;
+      while (el && el !== document.body) {
+        const ctx = el.getAttribute?.("data-hms-context");
+        if (ctx) {
+          detectedContext = ctx;
+          break;
+        }
+        el = el.parentElement;
       }
+
+      if (detectedContext) {
+        const label = labelForContext(detectedContext);
+        setContext(detectedContext, label);
+      } else {
+        clearOverride();
+      }
+
       setView({ name: "list" });
       const clampedX = Math.max(10, Math.min(window.innerWidth - size.width - 10, e.clientX - 20));
       const clampedY = Math.max(10, Math.min(window.innerHeight - size.height - 10, e.clientY - 20));
@@ -3091,7 +3184,7 @@ export function HmsPanel() {
 
     window.addEventListener("contextmenu", handleContextMenu);
     return () => window.removeEventListener("contextmenu", handleContextMenu);
-  }, [openPanel, size.width, size.height, setContext]);
+  }, [openPanel, size.width, size.height, setContext, clearOverride]);
 
   return (
     <div

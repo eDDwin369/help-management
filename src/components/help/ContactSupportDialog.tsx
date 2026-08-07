@@ -248,11 +248,15 @@ export function ContactSupportDialog({
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 px-6 py-3 border-t bg-card">
-              <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            <div className="flex justify-end gap-2 px-6 py-3.5 border-t bg-card">
+              <Button variant="ghost" onClick={() => onOpenChange(false)} className="text-slate-700 font-medium">
                 Cancel
               </Button>
-              <Button onClick={submit} disabled={submitting}>
+              <Button 
+                onClick={submit} 
+                disabled={submitting}
+                style={{ backgroundColor: '#0f172a', color: '#ffffff', fontWeight: 700, borderRadius: '8px', padding: '0 20px' }}
+              >
                 {submitting && <Loader2 className="size-4 animate-spin mr-1.5" />}
                 Submit Ticket
               </Button>

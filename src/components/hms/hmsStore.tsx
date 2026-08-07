@@ -718,6 +718,7 @@ interface HmsContextValue {
   /** Registered key of the active context, e.g. "site-recordings-table". */
   contextKey: string;
   setContext: (key: string, label?: string) => void;
+  clearOverride: () => void;
   /** Registers the section the user is currently viewing (tab / page level). */
   setSection: (key: string, label?: string) => void;
   isOpen: boolean;
@@ -800,6 +801,10 @@ export function HmsProvider({ children }: { children: ReactNode }) {
     setOverride({ key, label: label ?? labelForContext(key) });
   }, []);
 
+  const clearOverride = useCallback(() => {
+    setOverride(null);
+  }, []);
+
   // Section registration: switching section drops any component-level override
   // so the breadcrumb always follows the area the user is actually looking at.
   const setSection = useCallback((key: string, label?: string) => {
@@ -843,6 +848,7 @@ export function HmsProvider({ children }: { children: ReactNode }) {
       context,
       contextKey,
       setContext,
+      clearOverride,
       setSection,
       isOpen,
       openPanel,

@@ -214,6 +214,9 @@ export const CONTEXT_ARTICLE_MAP: Record<string, string[]> = {
 };
 
 export function labelForContext(key: string): string {
+  if (key.includes(" › ") || key.startsWith("My ") || key.startsWith("Drawing") || key.startsWith("Site ")) {
+    return key;
+  }
   return CONTEXT_LABELS[key] ?? key;
 }
 

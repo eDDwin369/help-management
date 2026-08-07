@@ -1,0 +1,349 @@
+.gs-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.4);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  animation: gsFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes gsFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* Modal Container */
+.gs-modal {
+  width: 1024px;
+  max-width: 95vw;
+  height: 560px;
+  max-height: 90vh;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: scale(0.98) translateY(10px);
+  animation: gsModalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  font-family: 'Inter', 'Roboto', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  transition: margin 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.gs-modal.gs-tab-header,
+.gs-modal.gs-tab-profile {
+  margin-top: 24px;
+}
+
+.gs-modal.gs-tab-sidebar {
+  margin-left: 40px;
+}
+
+.gs-modal.gs-tab-footer {
+  margin-bottom: 24px;
+}
+
+@keyframes gsModalIn {
+  from {
+    transform: scale(0.98) translateY(10px);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Header */
+.gs-header {
+  background: #FFFFFF;
+  border-bottom: 1px solid #E2E8F0;
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.gs-header-left h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0F172A;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.gs-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gs-icon-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.05s ease;
+}
+
+.gs-icon-btn:hover {
+  background: #F1F5F9;
+  color: #0F172A;
+}
+
+/* Tabs list row */
+.gs-tabs-row {
+  display: flex;
+  gap: 24px;
+  padding: 0 32px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+.gs-tab-btn {
+  background: transparent;
+  border: none;
+  padding: 14px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.05s ease;
+}
+
+.gs-tab-btn:hover {
+  color: #0f172a;
+}
+
+.gs-tab-btn.active {
+  color: #2563eb;
+  border-bottom: 2px solid #2563eb;
+}
+
+/* Modal Content area */
+.gs-content-body {
+  flex: 1;
+  overflow-y: hidden;
+  overflow-x: hidden;
+  padding: 24px;
+  background: #F8FAFC;
+  display: flex;
+  flex-direction: column;
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+}
+
+.gs-content-body::-webkit-scrollbar {
+  display: none;
+  /* Chrome, Safari and Opera */
+}
+
+/* Card layout wrapper */
+.gs-card-grid {
+  display: flex;
+  gap: 16px;
+  padding: 16px 24px;
+  flex: 1;
+}
+
+.gs-config-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 286px;
+}
+
+.gs-card-header {
+  margin-bottom: 10px;
+}
+
+.gs-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.gs-card-subtitle {
+  font-size: 12px;
+  color: #64748b;
+  margin: 4px 0 0 0;
+  line-height: 1.4;
+}
+
+/* Sticky Footer */
+.gs-footer {
+  background: #FFFFFF;
+  border-top: 1px solid #E2E8F0;
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.gs-btn-reset {
+  background: transparent;
+  color: #DC2626;
+  border: 1px solid transparent;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.05s ease;
+}
+
+.gs-btn-reset:hover {
+  background: #FEF2F2;
+}
+
+.gs-footer-right {
+  display: flex;
+  gap: 12px;
+}
+
+.gs-btn-cancel {
+  background: #ffffff;
+  color: #475569;
+  border: 1px solid #CBD5E1;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.05s ease;
+}
+
+.gs-btn-cancel:hover {
+  background: #F8FAFC;
+  color: #0F172A;
+  border-color: #94A3B8;
+}
+
+.gs-btn-save {
+  background: #2563EB;
+  color: #FFFFFF;
+  border: 1px solid transparent;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.05s ease;
+}
+
+.gs-btn-save:hover {
+  background: #1D4ED8;
+}
+
+/* Rich Configuration Tab Layouts */
+.gs-tab-content-container {
+  padding: 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE and Edge */
+}
+
+.gs-tab-content-container::-webkit-scrollbar {
+  display: none;
+  /* Chrome, Safari and Opera */
+}
+
+.gs-tab-header {
+  margin-bottom: 8px;
+}
+
+.gs-tab-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e3a8a;
+  margin: 0;
+}
+
+.gs-tab-subtitle {
+  font-size: 13px;
+  color: #64748b;
+  margin: 4px 0 16px 0;
+}
+
+.gs-cards-2x2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+/* Subtle Tinted Configuration Cards — single primary blue palette */
+.gs-card-blue,
+.gs-card-tint-1 {
+  background-color: #f0f4ff !important;
+  border-color: #dce5f5 !important;
+}
+
+.gs-card-green,
+.gs-card-tint-2 {
+  background-color: #e8eefb !important;
+  border-color: #c7d5f0 !important;
+}
+
+.gs-card-teal,
+.gs-card-orange,
+.gs-card-red,
+.gs-card-tint-3 {
+  background-color: #e0e8f7 !important;
+  border-color: #b8c9eb !important;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

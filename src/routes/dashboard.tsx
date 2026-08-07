@@ -56,9 +56,11 @@ function Dashboard() {
       navigate({ to: "/login", search: { redirect: "/dashboard" }, replace: true });
   }, [isLoading, user, navigate]);
 
-  // Keep the help panel breadcrumb aligned with the visible section.
+  // Keep the help panel breadcrumb aligned with the visible section and active tab label.
   useEffect(() => {
-    setSection(TAB_SECTION[tab] ?? "section-site-recordings");
+    const sectionKey = TAB_SECTION[tab] ?? "section-site-recordings";
+    const tabLabel = TABS.find((t) => t.v === tab)?.label ?? "Site Recordings";
+    setSection(sectionKey, tabLabel);
   }, [tab, setSection]);
 
   if (isLoading) return <PageLoader />;

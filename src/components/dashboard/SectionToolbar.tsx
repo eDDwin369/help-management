@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Search, Filter, LayoutGrid, LayoutList } from "lucide-react";
+import { Search, Filter, LayoutGrid, LayoutList, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,9 +48,19 @@ export function SectionToolbar({
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
           placeholder={placeholder}
-          className="pl-8 h-9"
+          className={`h-9 pl-8 ${query ? "pr-8" : ""}`}
           aria-label={placeholder}
         />
+        {query && (
+          <button
+            type="button"
+            onClick={() => onQueryChange("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 rounded-full hover:bg-muted transition-colors"
+            title="Clear search"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
       </div>
 
       {view && onViewChange && (
