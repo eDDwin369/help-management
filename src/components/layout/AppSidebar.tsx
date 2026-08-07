@@ -12,7 +12,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import '@/components/Dashboard/Dashboard.css';
+import '@/components/dashboard/Dashboard.css';
 
 interface AppSidebarProps {
   isEditing?: boolean;

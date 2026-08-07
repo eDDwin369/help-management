@@ -4,7 +4,7 @@ import { NotificationDropdown } from '../Notifications/NotificationDropdown';
 import { mockNotifications } from '../Notifications/mockData';
 import type { NotificationItem } from '../Notifications/types';
 import logo from '@/assets/logo.png';
-import '@/components/Dashboard/Dashboard.css';
+import '@/components/dashboard/Dashboard.css';
 import '@/components/Notifications/Notifications.css';
 
 const PRESET_THEMES = [
