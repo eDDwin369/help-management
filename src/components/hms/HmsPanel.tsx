@@ -3148,6 +3148,11 @@ export function HmsPanel() {
   // Global Right-Click Event Listener to position and open HMS modal at right-click mouse location
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
+      // If Super Admin Option 2 (Right-Click Inspector) is active, do not open HmsPanel on right click
+      if (document.documentElement.getAttribute("data-inspector-mode") === "right-click") {
+        return;
+      }
+
       const target = e.target as HTMLElement;
       // Do not block right clicks inside text inputs or textareas
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {

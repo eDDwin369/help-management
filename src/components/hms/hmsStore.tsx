@@ -791,6 +791,10 @@ export function HmsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (pathname.startsWith("/login") || !user) return;
     return initHmsRightClickHandler((key, label) => {
+      // If Super Admin Option 2 (Right-Click Inspector) is active, do not open chatbot panel automatically
+      if (document.documentElement.getAttribute("data-inspector-mode") === "right-click") {
+        return;
+      }
       setOverride({ key, label });
       setOpen(true);
       dispatch({ type: "DISMISS_NOTIFICATIONS", role });
