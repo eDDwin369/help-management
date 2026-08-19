@@ -33,6 +33,13 @@ export interface HmsAttachment {
   dataUrl: string;
 }
 
+export interface HmsArticleHierarchy {
+  pageName: string;
+  menuName?: string;
+  cardName: string;
+  controlName: string;
+}
+
 export interface HmsArticle {
   id: string;
   title: string;
@@ -41,6 +48,8 @@ export interface HmsArticle {
   contentUrl: string | null;
   /** Human readable breadcrumb of where the article was authored. */
   relatedContext: string;
+  /** Optional explicit hierarchy metadata (Page -> Menu -> Card -> Control). */
+  hierarchy?: HmsArticleHierarchy;
   /** Structured documentation body (text articles + fallback copy). */
   body?: ArticleSection[];
   /** Registered context keys this article is surfaced for. */
@@ -51,12 +60,36 @@ export interface HmsArticle {
   authorName: string;
   approvedBy: string | null;
   approvedAt: string | null;
+  rejectionReason?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
   createdAt: string;
   updatedAt: string;
   tags: string[];
   priority: Priority;
   sizeBytes?: number;
   pages?: number;
+}
+
+/** Helper to derive or retrieve structured 4-level hierarchy for an article. */
+export function getArticleHierarchy(a: HmsArticle): HmsArticleHierarchy {
+  if (a.hierarchy && a.hierarchy.pageName && a.hierarchy.cardName && a.hierarchy.controlName) {
+    return a.hierarchy;
+  }
+  const parts = (a.relatedContext || "").split(" › ").map((s) => s.trim()).filter(Boolean);
+  const pageName = parts[0] || "Help Management";
+  if (parts.length >= 4) {
+    return { pageName: parts[0], menuName: parts[1], cardName: parts[2], controlName: parts[3] };
+  } else if (parts.length === 3) {
+    return { pageName: parts[0], menuName: parts[1], cardName: parts[1], controlName: parts[2] };
+  } else if (parts.length === 2) {
+    return { pageName: parts[0], cardName: parts[0], controlName: parts[1] };
+  }
+  return {
+    pageName: pageName,
+    cardName: `${pageName} Card`,
+    controlName: a.title,
+  };
 }
 
 export interface HmsTicket {
@@ -611,7 +644,7 @@ type Action =
   | { type: "ADD_ARTICLE"; article: HmsArticle }
   | { type: "UPDATE_ARTICLE"; id: string; fields: Partial<HmsArticle> }
   | { type: "APPROVE_ARTICLE"; id: string; adminName: string }
-  | { type: "UNAPPROVE_ARTICLE"; id: string }
+  | { type: "UNAPPROVE_ARTICLE"; id: string; reason?: string; adminName?: string }
   | { type: "ARCHIVE_ARTICLE"; id: string }
   | { type: "DELETE_ARTICLE"; id: string }
   | { type: "SUBMIT_TICKET"; ticket: HmsTicket }
@@ -661,7 +694,16 @@ function reducer(state: HmsState, action: Action): HmsState {
       return {
         ...state,
         articles: state.articles.map((a) =>
-          a.id === action.id ? { ...a, approvalStatus: "unapproved", updatedAt: now } : a,
+          a.id === action.id
+            ? {
+                ...a,
+                approvalStatus: "unapproved",
+                rejectionReason: action.reason || a.rejectionReason || "Does not follow guidelines",
+                rejectedBy: action.adminName || "Jordan Admin",
+                rejectedAt: now,
+                updatedAt: now,
+              }
+            : a,
         ),
       };
     case "ARCHIVE_ARTICLE":
@@ -732,7 +774,7 @@ interface HmsContextValue {
   addArticle: (a: HmsArticle) => void;
   updateArticle: (id: string, fields: Partial<HmsArticle>) => void;
   approveArticle: (id: string) => void;
-  unapproveArticle: (id: string) => void;
+  unapproveArticle: (id: string, reason?: string) => void;
   archiveArticle: (id: string) => void;
   deleteArticle: (id: string) => void;
   submitTicket: (t: HmsTicket) => void;
@@ -865,7 +907,8 @@ export function HmsProvider({ children }: { children: ReactNode }) {
       updateArticle: (id, fields) => dispatch({ type: "UPDATE_ARTICLE", id, fields }),
       approveArticle: (id) =>
         dispatch({ type: "APPROVE_ARTICLE", id, adminName: user?.name ?? "Admin" }),
-      unapproveArticle: (id) => dispatch({ type: "UNAPPROVE_ARTICLE", id }),
+      unapproveArticle: (id, reason) =>
+        dispatch({ type: "UNAPPROVE_ARTICLE", id, reason, adminName: user?.name ?? "Admin" }),
       archiveArticle: (id) => dispatch({ type: "ARCHIVE_ARTICLE", id }),
       deleteArticle: (id) => dispatch({ type: "DELETE_ARTICLE", id }),
       submitTicket: (t) => dispatch({ type: "SUBMIT_TICKET", ticket: t }),

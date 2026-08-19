@@ -27,6 +27,7 @@ export function SectionToolbar({
   filterContent,
   filterActive,
   children,
+  searchWidthClassName = "flex-1 min-w-[220px] max-w-md",
 }: {
   searchContext: string;
   toggleContext?: string;
@@ -39,10 +40,11 @@ export function SectionToolbar({
   filterContent: ReactNode;
   filterActive?: boolean;
   children?: ReactNode;
+  searchWidthClassName?: string;
 }) {
   return (
     <div className="px-6 py-3 flex items-center gap-3 border-b flex-wrap">
-      <div className="relative w-64" data-hms-context={searchContext}>
+      <div className={`relative ${searchWidthClassName}`} data-hms-context={searchContext}>
         <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={query}

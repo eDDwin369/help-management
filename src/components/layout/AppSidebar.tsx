@@ -9,7 +9,8 @@ import {
   PanelLeftOpen,
   Pin,
   Ticket,
-  ShieldCheck
+  ShieldCheck,
+  Users
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import '@/components/dashboard/Dashboard.css';
@@ -208,6 +209,18 @@ export function AppSidebar({
                 </button>
               </div>
             )}
+          </a>
+
+          {/* User Tab */}
+          <a
+            href="#"
+            className={`nav-item ${path.startsWith('/admin') ? 'active' : ''}`}
+            onClick={(e) => { e.preventDefault(); handleNav('/admin'); }}
+            onMouseEnter={(e) => handleItemMouseEnter("User", e)}
+            onMouseLeave={handleItemMouseLeave}
+          >
+            <Users size={20} className="nav-icon" color="#ec4899" />
+            {isExpanded && <span className="nav-label">User</span>}
           </a>
 
           {/* Tickets */}
