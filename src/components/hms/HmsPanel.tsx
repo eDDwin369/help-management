@@ -2944,6 +2944,8 @@ export function HmsPanel() {
     clearOverride,
     panelRequest,
     consumePanelRequest,
+    lastRightClickPos,
+    clearRightClickPos,
   } = useHmsStore();
   const navigate = useNavigate();
   const [view, setView] = useState<View>({ name: "list" });
@@ -3014,6 +3016,14 @@ export function HmsPanel() {
   const [isResizing, setIsResizing] = useState(false);
   const userPosRef = useRef<{ x: number; y: number } | null>(null);
 
+  // Position panel at right-click location when opened via right-click
+  useEffect(() => {
+    if (isOpen && lastRightClickPos) {
+      userPosRef.current = lastRightClickPos;
+      setPos(lastRightClickPos);
+    }
+  }, [isOpen, lastRightClickPos]);
+
   // Resize for Preview ("detail") and Add/Edit ("add") while preserving right-click location for normal views
   useEffect(() => {
     if (view.name === "detail") {
@@ -3047,12 +3057,13 @@ export function HmsPanel() {
     if (!isOpen) {
       setView({ name: "list" });
       userPosRef.current = null;
+      clearRightClickPos();
       const timer = setTimeout(() => {
         setPos(null);
       }, 200);
       return () => clearTimeout(timer);
     }
-  }, [isOpen]);
+  }, [isOpen, clearRightClickPos]);
 
   const handleDragStart = useCallback(
     (e: React.MouseEvent) => {
@@ -3144,52 +3155,6 @@ export function HmsPanel() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isOpen, closePanel]);
-
-  // Global Right-Click Event Listener to position and open HMS modal at right-click mouse location
-  useEffect(() => {
-    const handleContextMenu = (e: MouseEvent) => {
-      // If Super Admin Option 2 (Right-Click Inspector) is active, do not open HmsPanel on right click
-      if (document.documentElement.getAttribute("data-inspector-mode") === "right-click") {
-        return;
-      }
-
-      const target = e.target as HTMLElement;
-      // Do not block right clicks inside text inputs or textareas
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
-        return;
-      }
-      e.preventDefault();
-
-      let el: HTMLElement | null = target;
-      let detectedContext: string | null = null;
-      while (el && el !== document.body) {
-        const ctx = el.getAttribute?.("data-hms-context");
-        if (ctx) {
-          detectedContext = ctx;
-          break;
-        }
-        el = el.parentElement;
-      }
-
-      if (detectedContext) {
-        const label = labelForContext(detectedContext);
-        setContext(detectedContext, label);
-      } else {
-        clearOverride();
-      }
-
-      setView({ name: "list" });
-      const clampedX = Math.max(10, Math.min(window.innerWidth - size.width - 10, e.clientX - 20));
-      const clampedY = Math.max(10, Math.min(window.innerHeight - size.height - 10, e.clientY - 20));
-      const rightClickPos = { x: clampedX, y: clampedY };
-      userPosRef.current = rightClickPos;
-      setPos(rightClickPos);
-      openPanel();
-    };
-
-    window.addEventListener("contextmenu", handleContextMenu);
-    return () => window.removeEventListener("contextmenu", handleContextMenu);
-  }, [openPanel, size.width, size.height, setContext, clearOverride]);
 
   return (
     <div

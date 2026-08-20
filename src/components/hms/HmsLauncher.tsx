@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 const NAVY = "#102040";
 
 export function HmsLauncher() {
-  const { isOpen, togglePanel, state, role } = useHmsStore();
+  const { isOpen, togglePanel, state, role, clearRightClickPos } = useHmsStore();
   const count =
     role === "admin"
       ? state.notifications.admin
@@ -12,10 +12,15 @@ export function HmsLauncher() {
         ? state.notifications.helpAdmin
         : state.notifications.customer;
 
+  const handleClick = () => {
+    clearRightClickPos();
+    togglePanel();
+  };
+
   return (
     <button
       type="button"
-      onClick={togglePanel}
+      onClick={handleClick}
       aria-label={
         isOpen
           ? "Close help panel"

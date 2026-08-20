@@ -763,6 +763,9 @@ interface HmsContextValue {
   clearOverride: () => void;
   /** Registers the section the user is currently viewing (tab / page level). */
   setSection: (key: string, label?: string) => void;
+  /** Last right click coordinates to position chatbox near cursor. */
+  lastRightClickPos: { x: number; y: number } | null;
+  clearRightClickPos: () => void;
   isOpen: boolean;
   openPanel: () => void;
   closePanel: () => void;
@@ -792,6 +795,7 @@ export function HmsProvider({ children }: { children: ReactNode }) {
   const [section, setSectionState] = useState<{ key: string; label: string } | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [panelRequest, setPanelRequest] = useState<PanelRequest | null>(null);
+  const [lastRightClickPos, setLastRightClickPos] = useState<{ x: number; y: number } | null>(null);
 
   const role: UserRole =
     user?.role === "admin" ? "admin" : user?.role === "sub_admin" ? "help-admin" : "customer";
@@ -828,16 +832,23 @@ export function HmsProvider({ children }: { children: ReactNode }) {
     setSectionState(null);
   }, [pathname]);
 
-  // Global right-click → detect nearest registered component context.
+  // Global right-click → detect nearest registered component context and position near cursor.
   // Disabled on the login screen: HMS is not available before sign-in.
   useEffect(() => {
     if (pathname.startsWith("/login") || !user) return;
-    return initHmsRightClickHandler((key, label) => {
+    return initHmsRightClickHandler((key, label, e) => {
       // If Super Admin Option 2 (Right-Click Inspector) is active, do not open chatbot panel automatically
       if (document.documentElement.getAttribute("data-inspector-mode") === "right-click") {
         return;
       }
       setOverride({ key, label });
+      if (e) {
+        const panelWidth = 320;
+        const panelHeight = 530;
+        const clampedX = Math.max(10, Math.min(window.innerWidth - panelWidth - 10, e.clientX - 20));
+        const clampedY = Math.max(10, Math.min(window.innerHeight - panelHeight - 10, e.clientY - 20));
+        setLastRightClickPos({ x: clampedX, y: clampedY });
+      }
       setOpen(true);
       dispatch({ type: "DISMISS_NOTIFICATIONS", role });
     });
@@ -861,6 +872,9 @@ export function HmsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const clearRightClickPos = useCallback(() => {
+    setLastRightClickPos(null);
+  }, []);
 
   const openPanel = useCallback(() => {
     setOpen(true);
@@ -896,6 +910,8 @@ export function HmsProvider({ children }: { children: ReactNode }) {
       setContext,
       clearOverride,
       setSection,
+      lastRightClickPos,
+      clearRightClickPos,
       isOpen,
       openPanel,
       closePanel,
@@ -922,6 +938,8 @@ export function HmsProvider({ children }: { children: ReactNode }) {
       contextKey,
       setContext,
       setSection,
+      lastRightClickPos,
+      clearRightClickPos,
       isOpen,
       openPanel,
       closePanel,

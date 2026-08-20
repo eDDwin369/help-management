@@ -234,9 +234,15 @@ export function initHmsRightClickHandler(
   onContextDetected: (context: string, label: string, event: MouseEvent) => void,
 ) {
   const handler = (e: MouseEvent) => {
+    let el = e.target as HTMLElement | null;
+
+    // Do not block right clicks inside text inputs or textareas
+    if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) {
+      return;
+    }
+
     e.preventDefault(); // suppress the browser context menu
 
-    let el = e.target as HTMLElement | null;
     while (el && el !== document.body) {
       const ctx = el.getAttribute?.("data-hms-context");
       if (ctx) {
