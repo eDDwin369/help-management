@@ -13,7 +13,7 @@ export function HoverFocusHighlight() {
     rect = target.element.getBoundingClientRect();
   }
 
-  if (!rect || (rect.width === 0 && rect.height === 0)) return null;
+  if (!rect || !target || (rect.width === 0 && rect.height === 0)) return null;
 
   // Smart positioning to prevent viewport cropping
   const isNearTop = rect.top < 55;

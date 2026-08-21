@@ -6,6 +6,7 @@ import { HelpInspectorProvider } from "@/lib/inspector-context";
 import { HelpInspectorBottomBar } from "@/components/help/HelpInspectorBottomBar";
 import { VisualHelpHighlighter } from "@/components/help/VisualHelpHighlighter";
 import { RightClickHelpMenu } from "@/components/help/RightClickHelpMenu";
+import { HelpAdminRightClickModal } from "@/components/help/HelpAdminRightClickModal";
 import { PageHelpReportModal } from "@/components/help/PageHelpReportModal";
 import { HoverFocusHighlight } from "@/components/help/HoverFocusHighlight";
 
@@ -26,6 +27,7 @@ export function HmsSurface() {
       <HmsPanel />
       <VisualHelpHighlighter />
       <RightClickHelpMenu />
+      <HelpAdminRightClickModal />
       <PageHelpReportModal />
       <HelpInspectorBottomBar />
       <HoverFocusHighlight />

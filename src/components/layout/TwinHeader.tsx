@@ -266,7 +266,7 @@ export function TwinHeader({
             }}
             onMouseDown={handleMouseDownButton}
             onMouseUp={handleMouseUpButton}
-            style={{ display: 'flex', alignItems: 'center', justifyCenter: 'center' }}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             <svg
               width="18"

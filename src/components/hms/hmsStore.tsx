@@ -841,6 +841,11 @@ export function HmsProvider({ children }: { children: ReactNode }) {
       if (document.documentElement.getAttribute("data-inspector-mode") === "right-click") {
         return;
       }
+      // If Help Admin role is active, dedicated HelpAdminRightClickModal handles the right-click UI
+      if (role === "help-admin") {
+        setOverride({ key, label });
+        return;
+      }
       setOverride({ key, label });
       if (e) {
         const panelWidth = 320;

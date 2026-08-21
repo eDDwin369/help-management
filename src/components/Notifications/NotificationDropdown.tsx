@@ -233,7 +233,7 @@ export function NotificationDropdown(props: NotificationDropdownProps) {
         ) : (
           <>
             <h2 className="new-notification-title">Notification</h2>
-            <div className="new-notification-header-actions" style={{ display: 'flex', items: 'center', gap: '6px' }}>
+            <div className="new-notification-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <button 
                 className="new-header-action-btn" 
                 onClick={() => {
@@ -436,7 +436,7 @@ export function NotificationDropdown(props: NotificationDropdownProps) {
                 </div>
 
                 {/* Right Details Column */}
-                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justify: 'center' }}>
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                   {/* Single Line: Actor Name, Action, Target, Category, Time, Unread Dot */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '12px' }}>
                     
