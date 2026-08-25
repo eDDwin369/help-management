@@ -1,12 +1,10 @@
 import { useAuth } from "@/lib/auth-context";
-import { useHelpInspector, type InspectorMode } from "@/lib/inspector-context";
+import { useHelpInspector } from "@/lib/inspector-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
   Sparkles,
-  MousePointerClick,
-  BarChart3,
   RefreshCw,
   Eye,
   EyeOff,
@@ -21,7 +19,6 @@ export function HelpInspectorBottomBar() {
     setIsEnabled,
     mode,
     setMode,
-    setReportModalOpen,
     totalLocationsWithHelp,
     totalArticlesOnPage,
     refreshLocations,
@@ -88,7 +85,7 @@ export function HelpInspectorBottomBar() {
           </label>
         </div>
 
-        {/* Mode Switcher Tabs */}
+        {/* Visual Highlighting Pill */}
         {isEnabled && (
           <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-full border border-slate-800 shrink-0">
             <Button
@@ -103,37 +100,6 @@ export function HelpInspectorBottomBar() {
             >
               <Sparkles className="h-3.5 w-3.5 text-amber-300" />
               <span>Option 1: Visual Highlighting</span>
-            </Button>
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setMode("right-click")}
-              className={`h-7 text-xs px-3 rounded-full transition-all duration-200 gap-1.5 ${
-                mode === "right-click"
-                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold shadow-md"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800"
-              }`}
-            >
-              <MousePointerClick className="h-3.5 w-3.5 text-sky-400" />
-              <span>Option 2: Right-Click List</span>
-            </Button>
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                setMode("report");
-                setReportModalOpen(true);
-              }}
-              className={`h-7 text-xs px-3 rounded-full transition-all duration-200 gap-1.5 ${
-                mode === "report"
-                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold shadow-md"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800"
-              }`}
-            >
-              <BarChart3 className="h-3.5 w-3.5 text-emerald-400" />
-              <span>Option 3: Reporting Model</span>
             </Button>
           </div>
         )}

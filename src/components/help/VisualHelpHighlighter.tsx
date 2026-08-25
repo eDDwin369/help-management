@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useHelpInspector } from "@/lib/inspector-context";
 import { useHmsStore } from "@/components/hms/hmsStore";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,21 @@ import { HelpCircle, Video, FileText, Image as ImageIcon, Sparkles, ExternalLink
 export function VisualHelpHighlighter() {
   const { isEnabled, mode, locations } = useHelpInspector();
   const { setContext, openPanel, requestPanelView } = useHmsStore();
+  const [activeKey, setActiveKey] = useState<string | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+
+  // Close active popover when clicking outside
+  useEffect(() => {
+    if (!activeKey) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(`[data-help-popover="${activeKey}"]`)) {
+        setActiveKey(null);
+      }
+    };
+    document.addEventListener("pointerdown", handleClickOutside);
+    return () => document.removeEventListener("pointerdown", handleClickOutside);
+  }, [activeKey]);
 
   if (!isEnabled || mode !== "visual") return null;
 
@@ -18,6 +32,7 @@ export function VisualHelpHighlighter() {
     <div className="pointer-events-none fixed inset-0 z-40">
       {locationsWithHelp.map((loc) => {
         const { contextKey, label, rect, articles } = loc;
+        const isActive = activeKey === contextKey;
         const isHovered = hoveredKey === contextKey;
 
         // Viewport boundary checks
@@ -27,14 +42,15 @@ export function VisualHelpHighlighter() {
         return (
           <div
             key={contextKey}
+            data-help-popover={contextKey}
             style={{
               position: "fixed",
               top: `${rect.top}px`,
               left: `${rect.left}px`,
               width: `${rect.width}px`,
               height: `${rect.height}px`,
-              // Stacking context elevation: Hovered location is elevated far above all other badges
-              zIndex: isHovered ? 9999 : 20,
+              // Stacking context elevation: Active location is elevated far above all other badges
+              zIndex: isActive ? 9999 : isHovered ? 30 : 20,
             }}
             className="pointer-events-auto group transition-all duration-150"
             onMouseEnter={() => setHoveredKey(contextKey)}
@@ -42,9 +58,15 @@ export function VisualHelpHighlighter() {
           >
             {/* Glowing border around target element */}
             <div
-              className={`absolute inset-0 rounded-lg border-2 border-indigo-500 bg-indigo-500/10 transition-all duration-200 ${
-                isHovered
-                  ? "border-indigo-400 bg-indigo-500/20 shadow-[0_0_22px_rgba(99,102,241,0.7)] scale-[1.01]"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveKey((prev) => (prev === contextKey ? null : contextKey));
+              }}
+              className={`absolute inset-0 rounded-lg border-2 border-indigo-500 bg-indigo-500/10 cursor-pointer transition-all duration-200 ${
+                isActive
+                  ? "border-indigo-400 bg-indigo-500/25 shadow-[0_0_25px_rgba(99,102,241,0.8)] scale-[1.01]"
+                  : isHovered
+                  ? "border-indigo-400 bg-indigo-500/20 shadow-[0_0_18px_rgba(99,102,241,0.6)]"
                   : "shadow-[0_0_12px_rgba(99,102,241,0.35)] animate-pulse opacity-90"
               }`}
             />
@@ -52,7 +74,7 @@ export function VisualHelpHighlighter() {
             {/* Smart Corner Badge */}
             <div
               className={`absolute flex items-center transition-all duration-150 ${
-                isHovered ? "z-[9999]" : "z-20"
+                isActive ? "z-[9999]" : "z-20"
               } ${isNearTop ? "top-1 right-1" : "-top-2.5 -right-2.5"}`}
             >
               <Button
@@ -60,20 +82,18 @@ export function VisualHelpHighlighter() {
                 className="h-6 px-2 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white font-semibold text-[11px] shadow-lg hover:shadow-indigo-500/50 hover:scale-105 transition-all duration-200 gap-1 border border-white/30"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setContext(contextKey, label);
-                  openPanel();
+                  setActiveKey((prev) => (prev === contextKey ? null : contextKey));
                 }}
               >
                 <Sparkles className="h-3 w-3 text-amber-300 animate-spin" style={{ animationDuration: "3s" }} />
-                <span>Help</span>
                 <span className="ml-0.5 rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] font-bold">
                   {articles.length}
                 </span>
               </Button>
             </div>
 
-            {/* Hover Micro-Card Tooltip (Elevated to z-[10000]) */}
-            {isHovered && (
+            {/* Click Micro-Card Tooltip (Elevated to z-[10000]) */}
+            {isActive && (
               <div
                 className={`absolute left-1/2 -translate-x-1/2 w-72 rounded-xl bg-slate-950/95 backdrop-blur-xl p-3 text-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.7)] border border-indigo-500/50 z-[10000] animate-in fade-in zoom-in-95 duration-150 pointer-events-auto ${
                   popoverShowBelow ? "top-full mt-2" : "bottom-full mb-2"
@@ -98,6 +118,7 @@ export function VisualHelpHighlighter() {
                         setContext(contextKey, label);
                         requestPanelView({ type: "article", id: art.id });
                         openPanel();
+                        setActiveKey(null);
                       }}
                       className="group/item flex items-center justify-between p-2 rounded-lg bg-slate-800/80 hover:bg-indigo-500/25 cursor-pointer transition-colors border border-transparent hover:border-indigo-500/30"
                     >
@@ -123,6 +144,7 @@ export function VisualHelpHighlighter() {
                     onClick={() => {
                       setContext(contextKey, label);
                       openPanel();
+                      setActiveKey(null);
                     }}
                   >
                     Open in HMS Panel →
