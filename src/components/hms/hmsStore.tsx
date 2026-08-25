@@ -815,8 +815,15 @@ export function HmsProvider({ children }: { children: ReactNode }) {
     if (!hydrated || typeof window === "undefined") return;
     try {
       const safeArticles = state.articles.map((a) => {
-        if (a.contentUrl && a.contentUrl.startsWith("data:") && a.contentUrl.length > 200000) {
-          return { ...a, contentUrl: a.contentUrl.slice(0, 500) };
+        if (a.contentUrl && a.contentUrl.startsWith("data:")) {
+          // If data URL was truncated/corrupted by prior slicing, repair with fallback
+          if (a.contentUrl.length <= 600 || !a.contentUrl.includes(";base64,")) {
+            return { ...a, contentUrl: ARTICLE_MEDIA[a.id] || "/help/pin-location-map.jpg" };
+          }
+          // If data URL is excessively large (> 1.5MB), use fallback sample instead of truncating base64
+          if (a.contentUrl.length > 1500000) {
+            return { ...a, contentUrl: ARTICLE_MEDIA[a.id] || "/help/pin-location-map.jpg" };
+          }
         }
         return a;
       });
@@ -837,12 +844,8 @@ export function HmsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (pathname.startsWith("/login") || !user) return;
     return initHmsRightClickHandler((key, label, e) => {
-      // If Super Admin Option 2 (Right-Click Inspector) is active, do not open chatbot panel automatically
-      if (document.documentElement.getAttribute("data-inspector-mode") === "right-click") {
-        return;
-      }
-      // If Help Admin role is active, dedicated HelpAdminRightClickModal handles the right-click UI
-      if (role === "help-admin") {
+      // If Admin / Super Admin or Help Admin role is active, dedicated HelpAdminRightClickModal handles the right-click UI
+      if (role === "admin" || role === "help-admin") {
         setOverride({ key, label });
         return;
       }

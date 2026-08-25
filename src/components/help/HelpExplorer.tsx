@@ -280,12 +280,18 @@ function PreviewPane({
             />
           </div>
         )}
-        {item.contentType === "image" && item.url && (
+        {item.contentType === "image" && (
           <div className="h-full flex items-center justify-center p-4">
             <img
-              src={item.url}
+              src={item.url || "/help/pin-location-map.jpg"}
               alt={item.title}
               className="max-h-full max-w-full rounded shadow"
+              onError={(e) => {
+                const target = e.currentTarget;
+                if (target.src !== "/help/pin-location-map.jpg") {
+                  target.src = "/help/pin-location-map.jpg";
+                }
+              }}
             />
           </div>
         )}

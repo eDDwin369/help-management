@@ -22,6 +22,7 @@ import { helpStore, REGISTERED_COMPONENTS } from "@/lib/mock-data";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 import type { HelpContentType, HelpItem } from "@/lib/types";
+import { compressImageFile } from "@/lib/utils";
 
 type HelpSectionType = HelpItem["sectionType"];
 
@@ -62,7 +63,6 @@ export function AddHelpItemDialog({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const reset = () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(null);
     setPreviewUrl(null);
     setTitle("");
@@ -72,12 +72,25 @@ export function AddHelpItemDialog({
     setContentType("video");
   };
 
-  const onFile = (f: File | null) => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  const onFile = async (f: File | null) => {
     setFile(f);
     if (f) {
-      setContentType(detectType(f));
-      setPreviewUrl(URL.createObjectURL(f));
+      const type = detectType(f);
+      setContentType(type);
+      if (type === "image") {
+        try {
+          const dataUrl = await compressImageFile(f);
+          setPreviewUrl(dataUrl || "/help/pin-location-map.jpg");
+        } catch {
+          setPreviewUrl("/help/pin-location-map.jpg");
+        }
+      } else {
+        const reader = new FileReader();
+        reader.onload = () => {
+          setPreviewUrl((reader.result as string) || null);
+        };
+        reader.readAsDataURL(f);
+      }
       if (!title) {
         setTitle(f.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " "));
       }

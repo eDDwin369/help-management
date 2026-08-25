@@ -36,6 +36,13 @@ import {
   Info,
   Trash2,
   Upload,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Hand,
+  Camera,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -74,6 +81,108 @@ const SAMPLE_MEDIA: Record<string, string> = {
   text: "This document contains step-by-step instructions for managing drawings and site plans in HMS.",
 };
 
+const LOCAL_STORAGE_NODES_KEY = "hms_help_admin_nodes";
+
+function deduplicateNodes(list: HelpAdminNode[]): HelpAdminNode[] {
+  const seenIds = new Set<string>();
+  const cleanList: HelpAdminNode[] = [];
+
+  for (const node of list) {
+    if (seenIds.has(node.id)) continue;
+    seenIds.add(node.id);
+
+    if (node.children && node.children.length > 0) {
+      cleanList.push({
+        ...node,
+        children: deduplicateNodes(node.children),
+      });
+    } else {
+      cleanList.push({
+        ...node,
+        children: node.children ? [] : undefined,
+      });
+    }
+  }
+
+  return cleanList;
+}
+
+function compressImageFile(file: File, maxWidth = 1200, maxHeight = 1200, quality = 0.82): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      if (!result) return resolve("");
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth || height > maxHeight) {
+          if (width / height > maxWidth / maxHeight) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const mimeType = file.type === "image/png" ? "image/png" : "image/jpeg";
+          resolve(canvas.toDataURL(mimeType, quality));
+        } else {
+          resolve(result);
+        }
+      };
+      img.onerror = () => resolve(result);
+      img.src = result;
+    };
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+}
+
+function repairNodeContent(node: HelpAdminNode): HelpAdminNode {
+  let contentUrl = node.contentUrl;
+  if (node.kind === "image") {
+    if (
+      !contentUrl ||
+      (contentUrl.startsWith("data:") && (contentUrl.length <= 600 || !contentUrl.includes(";base64,")))
+    ) {
+      contentUrl = SAMPLE_MEDIA.image;
+    }
+  } else if (node.kind === "video") {
+    if (!contentUrl || (contentUrl.startsWith("data:") && contentUrl.length <= 600)) {
+      contentUrl = SAMPLE_MEDIA.video;
+    }
+  } else if (node.kind === "pdf") {
+    if (!contentUrl || (contentUrl.startsWith("data:") && contentUrl.length <= 600)) {
+      contentUrl = SAMPLE_MEDIA.pdf;
+    }
+  }
+  const updated = { ...node, contentUrl };
+  if (updated.children && updated.children.length > 0) {
+    updated.children = updated.children.map(repairNodeContent);
+  }
+  return updated;
+}
+
+function loadSavedNodes(): HelpAdminNode[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const saved = localStorage.getItem(LOCAL_STORAGE_NODES_KEY);
+    const parsed: HelpAdminNode[] = saved ? JSON.parse(saved) : [];
+    return deduplicateNodes(parsed.map(repairNodeContent));
+  } catch (e) {
+    console.error("Failed to load saved help admin nodes:", e);
+    return [];
+  }
+}
+
 export function HelpAdminRightClickModal() {
   const { user } = useAuth();
   const { context, contextKey, addArticle, openPanel } = useHmsStore();
@@ -84,20 +193,82 @@ export function HelpAdminRightClickModal() {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [search, setSearch] = useState("");
 
-  // Tree nodes starting empty as requested!
-  const [nodes, setNodes] = useState<HelpAdminNode[]>([]);
+  // Tree nodes loaded from localStorage so created folders persist across page refreshes
+  const [nodes, setNodes] = useState<HelpAdminNode[]>(() => loadSavedNodes());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  // Persist nodes to localStorage whenever changed
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(LOCAL_STORAGE_NODES_KEY, JSON.stringify(nodes));
+    } catch (e) {
+      console.error("Failed to persist help admin nodes:", e);
+    }
+  }, [nodes]);
 
   // Add Item Dialog State
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addMode, setAddMode] = useState<"folder" | "file">("file");
   const [targetParentId, setTargetParentId] = useState<string | null>(null);
-  const [addKind, setAddKind] = useState<"folder" | "subfolder" | "pdf" | "image" | "video" | "text">("folder");
   const [itemName, setItemName] = useState("");
   const [itemDescription, setItemDescription] = useState("");
-  const [customFileUrl, setCustomFileUrl] = useState<string>("");
 
-  // Preview Dialog State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Preview Dialog & Toolbar Control States (Zoom, Pan, Fullscreen, Screenshot)
   const [previewNode, setPreviewNode] = useState<HelpAdminNode | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<number>(1.0);
+  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isPanActive, setIsPanActive] = useState<boolean>(false);
+  const [isPanning, setIsPanning] = useState<boolean>(false);
+  const [panStart, setPanStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  // Open Preview Modal & Reset Viewport controls
+  const handleOpenPreview = (node: HelpAdminNode) => {
+    setVisible(true);
+    const resolvedUrl =
+      node.contentUrl && node.contentUrl.length > 50
+        ? node.contentUrl
+        : SAMPLE_MEDIA[node.kind] || SAMPLE_MEDIA.image;
+
+    setPreviewNode({
+      ...node,
+      contentUrl: resolvedUrl,
+    });
+    setZoomLevel(1.0);
+    setPanOffset({ x: 0, y: 0 });
+    setIsPanActive(false);
+    setIsPanning(false);
+    setIsFullscreen(false);
+  };
+
+  const handleZoomIn = () => setZoomLevel((prev) => Math.min(3.0, Number((prev + 0.25).toFixed(2))));
+  const handleZoomOut = () => setZoomLevel((prev) => Math.max(0.5, Number((prev - 0.25).toFixed(2))));
+  const handleResetZoom = () => {
+    setZoomLevel(1.0);
+    setPanOffset({ x: 0, y: 0 });
+  };
+  const togglePanMode = () => setIsPanActive((prev) => !prev);
+  const toggleFullscreen = () => setIsFullscreen((prev) => !prev);
+
+  // Take Screenshot / Save Media Function
+  const handleTakeScreenshot = () => {
+    if (!previewNode) return;
+    const mediaUrl = previewNode.contentUrl || SAMPLE_MEDIA[previewNode.kind] || SAMPLE_MEDIA.image;
+
+    const a = document.createElement("a");
+    a.href = mediaUrl;
+    a.download = `${previewNode.name.toLowerCase().replace(/\s+/g, "_")}_preview.${
+      previewNode.kind === "pdf" ? "pdf" : previewNode.kind === "video" ? "mp4" : "png"
+    }`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    toast.success(`Screenshot / Preview saved for "${previewNode.name}"!`);
+  };
 
   // Folder Right-Click Context Menu State
   const [folderContextMenu, setFolderContextMenu] = useState<{
@@ -149,9 +320,10 @@ export function HelpAdminRightClickModal() {
     };
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (isDragging) return;
-      if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
-        if ((e.target as HTMLElement).closest('[role="dialog"]')) return;
+      if (isDragging || previewNode || addDialogOpen) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.closest('[role="dialog"]') || target.closest('[role="menu"]'))) return;
+      if (modalRef.current && !modalRef.current.contains(target as Node)) {
         setVisible(false);
         setFolderContextMenu(null);
       }
@@ -164,7 +336,7 @@ export function HelpAdminRightClickModal() {
       document.removeEventListener("contextmenu", handleContextMenu);
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isHelpAdmin, isDragging]);
+  }, [isHelpAdmin, isDragging, previewNode, addDialogOpen]);
 
   // Handle header dragging
   const handleHeaderMouseDown = (e: React.MouseEvent) => {
@@ -182,21 +354,30 @@ export function HelpAdminRightClickModal() {
   useEffect(() => {
     if (!isDragging) return;
 
+    let rafId: number | null = null;
+
     const handleMouseMove = (e: MouseEvent) => {
-      const dx = e.clientX - dragStartRef.current.mouseX;
-      const dy = e.clientY - dragStartRef.current.mouseY;
-      const modalW = 350;
-      const modalH = 440;
-      const nextX = Math.max(0, Math.min(window.innerWidth - modalW, dragStartRef.current.posX + dx));
-      const nextY = Math.max(0, Math.min(window.innerHeight - modalH, dragStartRef.current.posY + dy));
-      setPos({ x: nextX, y: nextY });
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const dx = e.clientX - dragStartRef.current.mouseX;
+        const dy = e.clientY - dragStartRef.current.mouseY;
+        const modalW = 350;
+        const modalH = 440;
+        const nextX = Math.max(0, Math.min(window.innerWidth - modalW, dragStartRef.current.posX + dx));
+        const nextY = Math.max(0, Math.min(window.innerHeight - modalH, dragStartRef.current.posY + dy));
+        setPos({ x: nextX, y: nextY });
+      });
     };
 
-    const handleMouseUp = () => setIsDragging(false);
+    const handleMouseUp = () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      setIsDragging(false);
+    };
 
-    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
     window.addEventListener("mouseup", handleMouseUp);
     return () => {
+      if (rafId) cancelAnimationFrame(rafId);
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
@@ -212,18 +393,230 @@ export function HelpAdminRightClickModal() {
     });
   };
 
-  // Open dialog to add root item or sub-folder/file
-  const openAddModal = (parentId: string | null = null, defaultKind: "folder" | "subfolder" | "pdf" = "folder") => {
+  // Drag & Drop State for moving nodes
+  const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
+  const [dropTargetFolderId, setDropTargetFolderId] = useState<string | null>(null);
+
+  // Drag handlers for tree items
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    e.stopPropagation();
+    setDraggedNodeId(id);
+    e.dataTransfer.setData("text/plain", id);
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, node: HelpAdminNode) => {
+    const isFolder = node.kind === "folder" || node.kind === "subfolder";
+    if (!isFolder || !draggedNodeId || draggedNodeId === node.id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+    setDropTargetFolderId(node.id);
+  };
+
+  const handleDragLeave = (e: React.DragEvent, node: HelpAdminNode) => {
+    e.stopPropagation();
+    if (dropTargetFolderId === node.id) {
+      setDropTargetFolderId(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetFolderId: string | null) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const sourceId = draggedNodeId || e.dataTransfer.getData("text/plain");
+
+    setDraggedNodeId(null);
+    setDropTargetFolderId(null);
+
+    if (!sourceId || sourceId === targetFolderId) return;
+
+    setNodes((prev) => {
+      const findNode = (list: HelpAdminNode[], id: string): HelpAdminNode | null => {
+        for (const n of list) {
+          if (n.id === id) return n;
+          if (n.children) {
+            const found = findNode(n.children, id);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+
+      const sourceNode = findNode(prev, sourceId);
+      if (!sourceNode) return prev;
+
+      if (targetFolderId) {
+        const isDescendant = (parent: HelpAdminNode, targetId: string): boolean => {
+          if (parent.id === targetId) return true;
+          if (!parent.children) return false;
+          return parent.children.some((c) => isDescendant(c, targetId));
+        };
+
+        if (isDescendant(sourceNode, targetFolderId)) {
+          toast.error("Cannot move a folder inside itself or its subfolder");
+          return prev;
+        }
+      }
+
+      let movedItem: HelpAdminNode | null = null;
+
+      const removeRecursive = (list: HelpAdminNode[]): HelpAdminNode[] => {
+        const acc: HelpAdminNode[] = [];
+        for (const item of list) {
+          if (item.id === sourceId) {
+            movedItem = { ...item, parentId: targetFolderId };
+            continue;
+          }
+          if (item.children && item.children.length > 0) {
+            acc.push({
+              ...item,
+              children: removeRecursive(item.children),
+            });
+          } else {
+            acc.push(item);
+          }
+        }
+        return acc;
+      };
+
+      const cleaned = removeRecursive(prev);
+      if (!movedItem) return prev;
+
+      const finalMovedItem = movedItem as HelpAdminNode;
+
+      if (!targetFolderId) {
+        return deduplicateNodes([finalMovedItem, ...cleaned]);
+      }
+
+      const insertRecursive = (list: HelpAdminNode[]): HelpAdminNode[] => {
+        return list.map((n) => {
+          if (n.id === targetFolderId) {
+            const existingChildren = (n.children || []).filter((c) => c.id !== finalMovedItem.id);
+            return {
+              ...n,
+              children: [finalMovedItem, ...existingChildren],
+            };
+          }
+          if (n.children && n.children.length > 0) {
+            return { ...n, children: insertRecursive(n.children) };
+          }
+          return n;
+        });
+      };
+
+      return deduplicateNodes(insertRecursive(cleaned));
+    });
+
+    if (targetFolderId) {
+      setExpandedIds((prev) => new Set(prev).add(targetFolderId));
+    }
+
+    toast.success("Moved item successfully");
+  };
+
+  // Open dialog to create folder or upload file
+  const openAddModal = (parentId: string | null = null, mode: "folder" | "file" = "file") => {
     setTargetParentId(parentId);
-    setAddKind(defaultKind);
+    setAddMode(mode);
     setItemName("");
     setItemDescription("");
-    setCustomFileUrl("");
     setAddDialogOpen(true);
     setFolderContextMenu(null);
   };
 
-  // Create new folder or file item
+  // Trigger direct file picker upload without modal
+  const triggerDirectFileUpload = (parentId: string | null = null) => {
+    setTargetParentId(parentId);
+    setFolderContextMenu(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+      fileInputRef.current.click();
+    }
+  };
+
+  // Direct File Select Handler (PDF, JPEG/PNG, Video, Text, etc.)
+  const handleDirectFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    let kind: "pdf" | "image" | "video" | "text" = "pdf";
+    if (file.type.startsWith("image/") || /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(file.name)) {
+      kind = "image";
+    } else if (file.type.startsWith("video/") || /\.(mp4|webm|mkv|mov|avi)$/i.test(file.name)) {
+      kind = "video";
+    } else if (file.type.includes("pdf") || /\.pdf$/i.test(file.name)) {
+      kind = "pdf";
+    } else {
+      kind = "text";
+    }
+
+    const formatFileSize = (bytes: number): string => {
+      if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
+      if (bytes >= 1000) return `${(bytes / 1000).toFixed(0)} KB`;
+      return `${bytes} B`;
+    };
+
+    const baseName = file.name.replace(/\.[^/.]+$/, "");
+
+    let contentUrl = "";
+    if (kind === "image") {
+      try {
+        contentUrl = await compressImageFile(file);
+      } catch {
+        contentUrl = SAMPLE_MEDIA.image;
+      }
+      if (!contentUrl) contentUrl = SAMPLE_MEDIA.image;
+    } else {
+      contentUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (evt) => resolve((evt.target?.result as string) || "");
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+      });
+    }
+
+    const newNode: HelpAdminNode = {
+      id: `node-${Date.now()}`,
+      name: baseName,
+      kind,
+      parentId: targetParentId,
+      owner: user?.name || "Help Admin",
+      modified: "Just now",
+      size: formatFileSize(file.size),
+      contentUrl: contentUrl || SAMPLE_MEDIA[kind] || SAMPLE_MEDIA.image,
+      approvalStatus: "draft",
+    };
+
+    if (!targetParentId) {
+      setNodes((prev) => [newNode, ...prev]);
+    } else {
+      setNodes((prev) => {
+        const updateRecursive = (list: HelpAdminNode[]): HelpAdminNode[] => {
+          return list.map((node) => {
+            if (node.id === targetParentId) {
+              return {
+                ...node,
+                children: [...(node.children || []), newNode],
+              };
+            }
+            if (node.children && node.children.length > 0) {
+              return { ...node, children: updateRecursive(node.children) };
+            }
+            return node;
+          });
+        };
+        return updateRecursive(prev);
+      });
+      if (targetParentId) {
+        setExpandedIds((prev) => new Set(prev).add(targetParentId));
+      }
+    }
+
+    toast.success(`Uploaded file "${file.name}"`);
+  };
+
+  // Create new folder node
   const handleCreateNode = (e: React.FormEvent) => {
     e.preventDefault();
     if (!itemName.trim()) return;
@@ -231,14 +624,13 @@ export function HelpAdminRightClickModal() {
     const newNode: HelpAdminNode = {
       id: `node-${Date.now()}`,
       name: itemName.trim(),
-      kind: addKind,
+      kind: targetParentId ? "subfolder" : "folder",
       parentId: targetParentId,
       owner: user?.name || "Help Admin",
       modified: "Just now",
       description: itemDescription.trim(),
-      contentUrl: customFileUrl.trim() || SAMPLE_MEDIA[addKind] || "",
       approvalStatus: "draft",
-      children: addKind === "folder" || addKind === "subfolder" ? [] : undefined,
+      children: [],
     };
 
     if (!targetParentId) {
@@ -267,13 +659,14 @@ export function HelpAdminRightClickModal() {
       setExpandedIds((prev) => new Set(prev).add(targetParentId));
     }
 
-    toast.success(`Created ${addKind === "folder" || addKind === "subfolder" ? "folder" : "file"} "${newNode.name}"`);
+    toast.success(`Created folder "${newNode.name}"`);
+    setItemName("");
+    setItemDescription("");
     setAddDialogOpen(false);
   };
 
-  // Handle right click on a folder node inside the list
-  const handleFolderRightClick = (e: React.MouseEvent, node: HelpAdminNode) => {
-    if (node.kind !== "folder" && node.kind !== "subfolder") return;
+  // Handle right click on any node (folder or file) inside the list
+  const handleNodeRightClick = (e: React.MouseEvent, node: HelpAdminNode) => {
     e.preventDefault();
     e.stopPropagation();
     setFolderContextMenu({
@@ -281,6 +674,23 @@ export function HelpAdminRightClickModal() {
       y: e.clientY,
       folderNode: node,
     });
+  };
+
+  // Delete node recursively (file or folder)
+  const handleDeleteNode = (node: HelpAdminNode) => {
+    setNodes((prev) => {
+      const removeRecursive = (list: HelpAdminNode[]): HelpAdminNode[] => {
+        return list
+          .filter((n) => n.id !== node.id)
+          .map((n) => ({
+            ...n,
+            children: n.children ? removeRecursive(n.children) : undefined,
+          }));
+      };
+      return removeRecursive(prev);
+    });
+    toast.info(`Deleted "${node.name}"`);
+    setFolderContextMenu(null);
   };
 
   // Send approval to Superadmin
@@ -341,14 +751,21 @@ export function HelpAdminRightClickModal() {
 
   const filteredNodes = useMemo(() => filterTree(nodes, search.trim().toLowerCase()), [nodes, search]);
 
-  if (!visible || !isHelpAdmin) return null;
+  if ((!visible && !previewNode && !addDialogOpen) || !isHelpAdmin) return null;
 
   return (
     <TooltipProvider delayDuration={150}>
       <div
         ref={modalRef}
-        style={{ top: `${pos.y}px`, left: `${pos.x}px` }}
-        className="fixed z-50 w-[350px] max-w-[92vw] rounded-xl bg-card border border-border/80 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-card-foreground select-none flex flex-col font-sans"
+        style={{
+          transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`,
+          top: 0,
+          left: 0,
+          willChange: isDragging ? "transform" : "auto",
+        }}
+        className={`fixed z-50 w-[350px] max-w-[92vw] rounded-xl bg-card border border-border/80 shadow-2xl overflow-hidden text-card-foreground select-none flex flex-col font-sans ${
+          isDragging ? "transition-none" : "transition-transform duration-75 ease-out"
+        }`}
       >
         {/* Header Bar - Draggable */}
         <div
@@ -424,13 +841,13 @@ export function HelpAdminRightClickModal() {
             <DropdownMenuContent align="start" className="w-48 text-xs">
               <DropdownMenuLabel>Help Admin Actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => openAddModal(null, "folder")}>
+              <DropdownMenuItem onClick={() => openAddFolderModal(null)}>
                 <FolderPlus className="mr-2 h-3.5 w-3.5 text-amber-500" />
                 Create Main Folder
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => openAddModal(null, "pdf")}>
-                <Plus className="mr-2 h-3.5 w-3.5 text-blue-600" />
-                Add Help File
+              <DropdownMenuItem onClick={() => triggerDirectFileUpload(null)}>
+                <Upload className="mr-2 h-3.5 w-3.5 text-blue-600" />
+                Upload Help File
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => { openPanel(); setVisible(false); }}>
                 <Sparkles className="mr-2 h-3.5 w-3.5 text-indigo-500" />
@@ -443,14 +860,14 @@ export function HelpAdminRightClickModal() {
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                onClick={() => openAddModal(null, "folder")}
+                onClick={() => openAddFolderModal(null)}
                 className="h-8 px-2.5 rounded-md bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-medium text-xs flex items-center justify-center gap-1 shadow-xs transition-all shrink-0"
               >
                 <Plus className="h-4 w-4 stroke-[2.5]" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs bg-slate-900 text-white font-semibold">
-              Click + to add help
+              Click + to create folder
             </TooltipContent>
           </Tooltip>
         </div>
@@ -462,20 +879,20 @@ export function HelpAdminRightClickModal() {
             <Tooltip>
               <TooltipTrigger asChild>
                 <div
-                  onClick={() => openAddModal(null, "folder")}
+                  onClick={() => openAddFolderModal(null)}
                   className="py-12 px-4 text-center cursor-pointer group transition-colors hover:bg-blue-50/50 dark:hover:bg-blue-950/20"
                 >
                   <div className="h-10 w-10 mx-auto rounded-full bg-blue-100 dark:bg-blue-950/50 text-blue-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
                     <Info className="h-5 w-5" />
                   </div>
-                  <h5 className="text-xs font-bold text-foreground">No Help Folders or Items</h5>
+                  <h5 className="text-xs font-bold text-foreground">No Help Folders</h5>
                   <p className="text-[11px] text-muted-foreground mt-1 max-w-[220px] mx-auto">
-                    Initially empty. Click the <span className="font-semibold text-blue-600">+</span> button to add a folder or help file.
+                    Initially empty. Click the <span className="font-semibold text-blue-600">+</span> button to create a folder.
                   </p>
                 </div>
               </TooltipTrigger>
               <TooltipContent side="top" className="text-xs bg-slate-900 text-white font-bold">
-                Click + to add help
+                Click + to create folder
               </TooltipContent>
             </Tooltip>
           ) : filteredNodes.length === 0 ? (
@@ -483,17 +900,28 @@ export function HelpAdminRightClickModal() {
               No matching folders or items found.
             </div>
           ) : (
-            <div className="p-1 space-y-0.5">
+            <div
+              className="p-1 space-y-0.5"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => handleDrop(e, null)}
+            >
               {filteredNodes.map((node) => (
                 <TreeNodeItem
                   key={node.id}
                   node={node}
                   level={0}
                   expandedIds={expandedIds}
+                  draggedNodeId={draggedNodeId}
+                  dropTargetFolderId={dropTargetFolderId}
                   onToggleFolder={toggleFolder}
-                  onFolderRightClick={handleFolderRightClick}
-                  onPreview={(n) => setPreviewNode(n)}
+                  onFolderRightClick={handleNodeRightClick}
+                  onPreview={(n) => handleOpenPreview(n)}
                   onSendApproval={handleSendApproval}
+                  onDeleteNode={handleDeleteNode}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
                 />
               ))}
             </div>
@@ -517,7 +945,7 @@ export function HelpAdminRightClickModal() {
           </button>
         </div>
 
-        {/* Folder Right-Click Context Menu Floating Overlay */}
+        {/* Right-Click Context Menu Floating Overlay */}
         {folderContextMenu && (
           <div
             style={{
@@ -527,177 +955,311 @@ export function HelpAdminRightClickModal() {
             className="absolute z-50 w-44 rounded-lg bg-card border border-border shadow-xl p-1 text-xs animate-in fade-in zoom-in-95 duration-100"
           >
             <div className="px-2 py-1 font-bold text-[10px] text-muted-foreground border-b border-border/50 truncate">
-              📁 {folderContextMenu.folderNode.name}
+              {folderContextMenu.folderNode.kind === "folder" || folderContextMenu.folderNode.kind === "subfolder"
+                ? "📁"
+                : "📄"}{" "}
+              {folderContextMenu.folderNode.name}
             </div>
+
+            {folderContextMenu.folderNode.kind === "folder" || folderContextMenu.folderNode.kind === "subfolder" ? (
+              <>
+                <button
+                  onClick={() => openAddFolderModal(folderContextMenu.folderNode.id)}
+                  className="w-full text-left px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2 text-foreground font-medium"
+                >
+                  <FolderPlus className="h-3.5 w-3.5 text-amber-500" />
+                  Add Sub-folder
+                </button>
+                <button
+                  onClick={() => triggerDirectFileUpload(folderContextMenu.folderNode.id)}
+                  className="w-full text-left px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2 text-foreground font-medium"
+                >
+                  <Upload className="h-3.5 w-3.5 text-blue-600" />
+                  Upload File
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    handleOpenPreview(folderContextMenu.folderNode);
+                    setFolderContextMenu(null);
+                  }}
+                  className="w-full text-left px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2 text-foreground font-medium"
+                >
+                  <Eye className="h-3.5 w-3.5 text-blue-500" />
+                  Preview File
+                </button>
+                {folderContextMenu.folderNode.approvalStatus !== "approved" && (
+                  <button
+                    onClick={() => {
+                      handleSendApproval(folderContextMenu.folderNode);
+                      setFolderContextMenu(null);
+                    }}
+                    className="w-full text-left px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2 text-indigo-600 font-medium"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    Send Approval
+                  </button>
+                )}
+              </>
+            )}
+
             <button
-              onClick={() => openAddModal(folderContextMenu.folderNode.id, "subfolder")}
-              className="w-full text-left px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2 text-foreground font-medium"
-            >
-              <FolderPlus className="h-3.5 w-3.5 text-amber-500" />
-              Add Sub-folder
-            </button>
-            <button
-              onClick={() => openAddModal(folderContextMenu.folderNode.id, "pdf")}
-              className="w-full text-left px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2 text-foreground font-medium"
-            >
-              <Plus className="h-3.5 w-3.5 text-blue-600" />
-              Add File
-            </button>
-            <button
-              onClick={() => {
-                toast.info(`Deleted "${folderContextMenu.folderNode.name}"`);
-                setNodes((prev) => prev.filter((n) => n.id !== folderContextMenu.folderNode.id));
-                setFolderContextMenu(null);
-              }}
-              className="w-full text-left px-2 py-1.5 rounded hover:bg-red-50 text-red-600 font-medium flex items-center gap-2"
+              onClick={() => handleDeleteNode(folderContextMenu.folderNode)}
+              className="w-full text-left px-2 py-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/50 text-red-600 font-medium flex items-center gap-2"
             >
               <Trash2 className="h-3.5 w-3.5" />
-              Delete Folder
+              Delete {folderContextMenu.folderNode.kind === "folder" || folderContextMenu.folderNode.kind === "subfolder" ? "Folder" : "Content"}
             </button>
           </div>
         )}
       </div>
 
-      {/* Add Folder / File Modal */}
+      {/* Hidden native file input for direct OS file picker upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleDirectFileUpload}
+        className="hidden"
+        accept="*/*"
+      />
+
+      {/* Add Folder / Content Modal */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent className="max-w-sm rounded-xl">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold flex items-center justify-between gap-2">
-              <span className="flex items-center gap-2">
-                <Plus className="h-4 w-4 text-blue-600" />
-                {targetParentId ? "Add Sub-folder or File" : "Create Folder or Help File"}
-              </span>
-
-              {/* Info Icon 'i' */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="h-5 w-5 rounded-full bg-muted hover:bg-slate-200 dark:hover:bg-slate-800 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors shrink-0"
-                    title="Information"
-                  >
-                    <Info className="h-3.5 w-3.5 text-blue-600" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs bg-slate-900 text-white font-medium max-w-[240px]">
-                  Add a new help resource or organized folder to this section.
-                </TooltipContent>
-              </Tooltip>
+            <DialogTitle className="text-base font-bold flex items-center gap-2 pr-8">
+              <Plus className="h-4 w-4 text-blue-600 shrink-0" />
+              <span>Add Help Resource</span>
             </DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleCreateNode} className="space-y-3.5 mt-2">
-            <div className="space-y-1">
-              <Label className="text-xs">Item Type</Label>
-              <div className="grid grid-cols-3 gap-1.5">
+          {/* Mode Tabs */}
+          <div className="flex bg-muted p-1 rounded-lg gap-1 text-xs font-semibold mt-1">
+            <button
+              type="button"
+              onClick={() => setAddMode("file")}
+              className={`flex-1 py-1.5 rounded-md flex items-center justify-center gap-1.5 transition-all ${
+                addMode === "file" ? "bg-white dark:bg-card text-blue-600 shadow-xs" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Upload className="h-3.5 w-3.5" />
+              Upload Content
+            </button>
+            <button
+              type="button"
+              onClick={() => setAddMode("folder")}
+              className={`flex-1 py-1.5 rounded-md flex items-center justify-center gap-1.5 transition-all ${
+                addMode === "folder" ? "bg-white dark:bg-card text-blue-600 shadow-xs" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <FolderPlus className="h-3.5 w-3.5 text-amber-500" />
+              New Folder
+            </button>
+          </div>
+
+          {addMode === "file" ? (
+            <div className="space-y-3 pt-2">
+              <div
+                onClick={() => {
+                  setAddDialogOpen(false);
+                  triggerDirectFileUpload(targetParentId);
+                }}
+                className="border-2 border-dashed border-blue-300 dark:border-blue-800 hover:border-blue-600 rounded-xl p-5 text-center cursor-pointer transition-all bg-blue-50/50 dark:hover:bg-blue-950/30 group"
+              >
+                <Upload className="h-7 w-7 mx-auto text-blue-600 group-hover:scale-110 transition-transform mb-1.5" />
+                <p className="text-xs font-bold text-foreground">Click to upload file</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Images, PDFs, Videos & Docs</p>
+              </div>
+
+              <div className="flex justify-end pt-1">
                 <Button
                   type="button"
+                  variant="ghost"
                   size="sm"
-                  variant={addKind === "folder" || addKind === "subfolder" ? "default" : "outline"}
-                  className="h-8 text-xs gap-1"
-                  onClick={() => setAddKind(targetParentId ? "subfolder" : "folder")}
+                  className="h-8 text-xs"
+                  onClick={() => setAddDialogOpen(false)}
                 >
-                  <Folder className="h-3.5 w-3.5 text-amber-400" /> Folder
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={addKind === "pdf" ? "default" : "outline"}
-                  className="h-8 text-xs gap-1"
-                  onClick={() => setAddKind("pdf")}
-                >
-                  <FileText className="h-3.5 w-3.5 text-blue-500" /> PDF
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={addKind === "image" ? "default" : "outline"}
-                  className="h-8 text-xs gap-1"
-                  onClick={() => setAddKind("image")}
-                >
-                  <ImageIcon className="h-3.5 w-3.5 text-emerald-500" /> Image
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={addKind === "video" ? "default" : "outline"}
-                  className="h-8 text-xs gap-1"
-                  onClick={() => setAddKind("video")}
-                >
-                  <Video className="h-3.5 w-3.5 text-rose-500" /> Video
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={addKind === "text" ? "default" : "outline"}
-                  className="h-8 text-xs gap-1 col-span-2"
-                  onClick={() => setAddKind("text")}
-                >
-                  <FileText className="h-3.5 w-3.5 text-purple-500" /> Text Guide
+                  Cancel
                 </Button>
               </div>
             </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Name</Label>
-              <Input
-                placeholder={
-                  addKind === "folder" || addKind === "subfolder"
-                    ? "e.g. Site Recordings Manual"
-                    : "e.g. Foundation Plan Guide"
-                }
-                value={itemName}
-                onChange={(e) => setItemName(e.target.value)}
-                className="h-8 text-xs"
-                autoFocus
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Description (Optional)</Label>
-              <Textarea
-                placeholder="Brief summary for users..."
-                value={itemDescription}
-                onChange={(e) => setItemDescription(e.target.value)}
-                className="h-16 text-xs resize-none"
-              />
-            </div>
-
-            {addKind !== "folder" && addKind !== "subfolder" && (
+          ) : (
+            <form onSubmit={handleCreateNode} className="space-y-3.5 mt-2">
               <div className="space-y-1">
-                <Label className="text-xs">File Asset URL / Path</Label>
+                <Label className="text-xs">Folder Name</Label>
                 <Input
-                  placeholder="e.g. /help/site-recordings-table-guide.pdf"
-                  value={customFileUrl}
-                  onChange={(e) => setCustomFileUrl(e.target.value)}
-                  className="h-8 text-xs font-mono text-[11px]"
+                  placeholder="e.g. Site Recordings Manual"
+                  value={itemName}
+                  onChange={(e) => setItemName(e.target.value)}
+                  className="h-8 text-xs"
+                  autoFocus
                 />
               </div>
-            )}
 
-            <div className="flex justify-end gap-2 pt-2 border-t">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-8 text-xs"
-                onClick={() => setAddDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" size="sm" className="h-8 text-xs bg-blue-600 hover:bg-blue-700">
-                Create Item
-              </Button>
-            </div>
-          </form>
+              <div className="space-y-1">
+                <Label className="text-xs">Description (Optional)</Label>
+                <Textarea
+                  placeholder="Brief summary for users..."
+                  value={itemDescription}
+                  onChange={(e) => setItemDescription(e.target.value)}
+                  className="h-16 text-xs resize-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => setAddDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm" className="h-8 text-xs bg-blue-600 hover:bg-blue-700">
+                  Create Folder
+                </Button>
+              </div>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
 
       {/* File Preview Modal */}
       {previewNode && (
-        <Dialog open={!!previewNode} onOpenChange={(open) => !open && setPreviewNode(null)}>
-          <DialogContent className="max-w-xl rounded-xl">
-            <DialogHeader className="border-b pb-3">
+        <Dialog
+          open={!!previewNode}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPreviewNode(null);
+              setIsFullscreen(false);
+            }
+          }}
+        >
+          <DialogContent
+            className={`rounded-2xl transition-all relative z-[10000] ${
+              isFullscreen ? "max-w-5xl w-[95vw] h-[90vh] max-h-[90vh] flex flex-col" : "max-w-xl"
+            }`}
+          >
+            {/* Apple-Style UI Floating Navigation Glassmorphic Pill Bar OUTSIDE Top of Modal */}
+            <div className="absolute -top-14 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/90 dark:bg-slate-950/95 backdrop-blur-xl border border-white/20 shadow-2xl text-white text-xs select-none animate-in fade-in slide-in-from-bottom-3 duration-200">
+              {/* Zoom Out */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleZoomOut}
+                    disabled={zoomLevel <= 0.5}
+                    className="p-1.5 rounded-full hover:bg-white/20 active:scale-95 disabled:opacity-40 transition-all text-white"
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs bg-slate-950 text-white border border-white/10 font-semibold">
+                  Zoom Out
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Zoom Percentage Badge */}
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white/15 text-slate-100 min-w-[46px] text-center">
+                {Math.round(zoomLevel * 100)}%
+              </span>
+
+              {/* Zoom In */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleZoomIn}
+                    disabled={zoomLevel >= 3.0}
+                    className="p-1.5 rounded-full hover:bg-white/20 active:scale-95 disabled:opacity-40 transition-all text-white"
+                  >
+                    <ZoomIn className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs bg-slate-950 text-white border border-white/10 font-semibold">
+                  Zoom In
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Reset View */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleResetZoom}
+                    className="p-1.5 rounded-full hover:bg-white/20 active:scale-95 transition-all text-white"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs bg-slate-950 text-white border border-white/10 font-semibold">
+                  Reset Zoom & Pan
+                </TooltipContent>
+              </Tooltip>
+
+              <div className="h-4 w-px bg-white/20 mx-1" />
+
+              {/* Pan Mode */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={togglePanMode}
+                    className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 transition-all ${
+                      isPanActive
+                        ? "bg-blue-600 text-white shadow-md shadow-blue-500/40"
+                        : "hover:bg-white/20 text-slate-200"
+                    }`}
+                  >
+                    <Hand className="h-3.5 w-3.5" />
+                    <span>Pan</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs bg-slate-950 text-white border border-white/10 font-semibold">
+                  {isPanActive ? "Pan Active (Click & Drag)" : "Enable Pan Mode"}
+                </TooltipContent>
+              </Tooltip>
+
+              <div className="h-4 w-px bg-white/20 mx-1" />
+
+              {/* Screenshot */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleTakeScreenshot}
+                    className="px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 hover:bg-white/20 text-slate-200 transition-all"
+                  >
+                    <Camera className="h-3.5 w-3.5 text-blue-400" />
+                    <span>Screenshot</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs bg-slate-950 text-white border border-white/10 font-semibold">
+                  Take Screenshot / Download
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Fullscreen */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={toggleFullscreen}
+                    className="p-1.5 rounded-full hover:bg-white/20 active:scale-95 transition-all text-white ml-0.5"
+                  >
+                    {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs bg-slate-950 text-white border border-white/10 font-semibold">
+                  {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            <DialogHeader className="border-b pb-2 shrink-0">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <DialogTitle className="text-base font-bold flex items-center gap-2">
@@ -727,58 +1289,79 @@ export function HelpAdminRightClickModal() {
               </div>
             </DialogHeader>
 
-            {/* Media Content Preview */}
-            <div className="py-3">
-              {previewNode.kind === "image" && (
-                <div className="rounded-lg overflow-hidden border border-border bg-slate-900/5 flex items-center justify-center max-h-[300px]">
-                  <img
-                    src={previewNode.contentUrl || SAMPLE_MEDIA.image}
-                    alt={previewNode.name}
-                    className="max-h-[300px] w-auto object-contain"
-                  />
-                </div>
-              )}
+            {/* Interactive Media Canvas Container with Zoom & Pan */}
+            <div className="py-2 flex-1 min-h-0 overflow-hidden">
+              <div
+                className={`relative rounded-xl overflow-hidden border border-border bg-slate-900/5 flex items-center justify-center transition-all ${
+                  isFullscreen ? "h-full min-h-[420px]" : "h-[340px]"
+                } ${isPanActive ? "cursor-grab active:cursor-grabbing select-none" : ""}`}
+                onMouseDown={(e) => {
+                  if (!isPanActive) return;
+                  setIsPanning(true);
+                  setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+                }}
+                onMouseMove={(e) => {
+                  if (!isPanning || !isPanActive) return;
+                  setPanOffset({
+                    x: e.clientX - panStart.x,
+                    y: e.clientY - panStart.y,
+                  });
+                }}
+                onMouseUp={() => setIsPanning(false)}
+                onMouseLeave={() => setIsPanning(false)}
+              >
+                <div
+                  style={{
+                    transform: `scale(${zoomLevel}) translate3d(${panOffset.x / zoomLevel}px, ${panOffset.y / zoomLevel}px, 0)`,
+                    transition: isPanning ? "none" : "transform 0.15s ease-out",
+                  }}
+                  className="w-full h-full flex items-center justify-center"
+                >
+                  {previewNode.kind === "image" && (
+                    <img
+                      src={previewNode.contentUrl || SAMPLE_MEDIA.image}
+                      alt={previewNode.name}
+                      className="max-h-full max-w-full object-contain pointer-events-none"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (target.src !== SAMPLE_MEDIA.image) {
+                          target.src = SAMPLE_MEDIA.image;
+                        }
+                      }}
+                    />
+                  )}
 
-              {previewNode.kind === "video" && (
-                <div className="rounded-lg overflow-hidden border border-border bg-black max-h-[300px]">
-                  <video
-                    src={previewNode.contentUrl || SAMPLE_MEDIA.video}
-                    controls
-                    autoPlay
-                    className="w-full max-h-[300px]"
-                  />
-                </div>
-              )}
+                  {previewNode.kind === "video" && (
+                    <video
+                      src={previewNode.contentUrl || SAMPLE_MEDIA.video}
+                      controls
+                      autoPlay
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  )}
 
-              {previewNode.kind === "pdf" && (
-                <div className="rounded-lg border border-border p-4 bg-slate-50 dark:bg-slate-900/50 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <FileText className="h-8 w-8 text-blue-600 shrink-0" />
-                    <div>
-                      <h6 className="text-xs font-bold">{previewNode.name}</h6>
-                      <p className="text-[11px] text-muted-foreground">PDF Document • 3.2 MB</p>
+                  {previewNode.kind === "pdf" && (
+                    <iframe
+                      src={previewNode.contentUrl || SAMPLE_MEDIA.pdf}
+                      className="w-full h-full rounded border border-border bg-white"
+                      title={previewNode.name}
+                    />
+                  )}
+
+                  {previewNode.kind === "text" && (
+                    <div className="p-4 bg-white dark:bg-card text-xs space-y-2 leading-relaxed w-full h-full overflow-y-auto">
+                      <p className="font-semibold text-slate-800 dark:text-slate-200">
+                        {previewNode.description || previewNode.name}
+                      </p>
+                      <p className="text-muted-foreground">{SAMPLE_MEDIA.text}</p>
                     </div>
-                  </div>
-                  <iframe
-                    src={previewNode.contentUrl || SAMPLE_MEDIA.pdf}
-                    className="w-full h-48 rounded border border-border"
-                    title={previewNode.name}
-                  />
+                  )}
                 </div>
-              )}
-
-              {previewNode.kind === "text" && (
-                <div className="rounded-lg border border-border p-4 bg-white dark:bg-card text-xs space-y-2 leading-relaxed">
-                  <p className="font-semibold text-slate-800 dark:text-slate-200">
-                    {previewNode.description || previewNode.name}
-                  </p>
-                  <p className="text-muted-foreground">{SAMPLE_MEDIA.text}</p>
-                </div>
-              )}
+              </div>
             </div>
 
             {/* Footer Action: Send Approval to Superadmin */}
-            <div className="flex items-center justify-between pt-3 border-t">
+            <div className="flex items-center justify-between pt-2 border-t shrink-0">
               <span className="text-xs text-muted-foreground">
                 Status: <span className="font-semibold capitalize text-foreground">{previewNode.approvalStatus}</span>
               </span>
@@ -809,28 +1392,57 @@ function TreeNodeItem({
   node,
   level,
   expandedIds,
+  draggedNodeId,
+  dropTargetFolderId,
   onToggleFolder,
   onFolderRightClick,
   onPreview,
   onSendApproval,
+  onDeleteNode,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
 }: {
   node: HelpAdminNode;
   level: number;
   expandedIds: Set<string>;
+  draggedNodeId: string | null;
+  dropTargetFolderId: string | null;
   onToggleFolder: (id: string) => void;
   onFolderRightClick: (e: React.MouseEvent, n: HelpAdminNode) => void;
   onPreview: (n: HelpAdminNode) => void;
   onSendApproval: (n: HelpAdminNode) => void;
+  onDeleteNode: (n: HelpAdminNode) => void;
+  onDragStart: (e: React.DragEvent, id: string) => void;
+  onDragOver: (e: React.DragEvent, n: HelpAdminNode) => void;
+  onDragLeave: (e: React.DragEvent, n: HelpAdminNode) => void;
+  onDrop: (e: React.DragEvent, targetFolderId: string | null) => void;
 }) {
   const isFolder = node.kind === "folder" || node.kind === "subfolder";
   const isExpanded = expandedIds.has(node.id);
+  const isBeingDragged = draggedNodeId === node.id;
+  const isDropTarget = dropTargetFolderId === node.id;
 
   return (
-    <div>
+    <div
+      draggable
+      onDragStart={(e) => onDragStart(e, node.id)}
+      onDragOver={(e) => isFolder && onDragOver(e, node)}
+      onDragLeave={(e) => isFolder && onDragLeave(e, node)}
+      onDrop={(e) => isFolder && onDrop(e, node.id)}
+      className={`transition-all rounded-md ${
+        isBeingDragged ? "opacity-35 scale-95" : ""
+      }`}
+    >
       <div
         style={{ paddingLeft: `${level * 16 + 8}px` }}
-        onContextMenu={(e) => isFolder && onFolderRightClick(e, node)}
-        className="group px-2 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-muted/50 flex items-center justify-between gap-1.5 text-xs transition-colors cursor-pointer"
+        onContextMenu={(e) => onFolderRightClick(e, node)}
+        className={`group px-2 py-1.5 rounded-md flex items-center justify-between gap-1.5 text-xs transition-colors cursor-grab active:cursor-grabbing ${
+          isDropTarget
+            ? "bg-blue-100 dark:bg-blue-950/70 border-2 border-dashed border-blue-500 font-bold"
+            : "hover:bg-slate-100 dark:hover:bg-muted/50"
+        }`}
       >
         <div
           onClick={() => (isFolder ? onToggleFolder(node.id) : onPreview(node))}
@@ -858,18 +1470,46 @@ function TreeNodeItem({
           <span className="font-semibold truncate text-slate-800 dark:text-slate-200">
             {node.name}
           </span>
+
+          {node.description && node.description.trim().length > 0 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-4 w-4 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-blue-500 flex items-center justify-center transition-colors shrink-0 ml-0.5"
+                  title="Folder Description"
+                >
+                  <Info className="h-3 w-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs bg-slate-900 text-white font-medium max-w-[220px]">
+                {node.description}
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
 
         {/* Status Badge & Actions */}
         <div className="flex items-center gap-1 shrink-0">
           {!isFolder && (
-            <button
-              onClick={() => onPreview(node)}
-              className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground opacity-60 group-hover:opacity-100 transition-opacity"
-              title="Preview File"
-            >
-              <Eye className="h-3.5 w-3.5" />
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPreview(node);
+                  }}
+                  className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground opacity-60 group-hover:opacity-100 transition-opacity"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs bg-slate-900 text-white font-semibold">
+                Preview
+              </TooltipContent>
+            </Tooltip>
           )}
 
           {node.approvalStatus === "pending" ? (
@@ -881,14 +1521,43 @@ function TreeNodeItem({
               <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" /> Approved
             </Badge>
           ) : (
-            <button
-              onClick={() => onSendApproval(node)}
-              className="h-5 px-1.5 rounded text-[10px] font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200 flex items-center gap-0.5 transition-colors"
-              title="Send Approval to Superadmin"
-            >
-              <Send className="h-2.5 w-2.5" /> Approve
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSendApproval(node);
+                  }}
+                  className="h-5 w-5 rounded hover:bg-indigo-100 dark:hover:bg-indigo-950/60 text-indigo-600 border border-indigo-200/80 flex items-center justify-center transition-colors shrink-0"
+                >
+                  <Send className="h-3 w-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs bg-slate-900 text-white font-semibold">
+                Approve
+              </TooltipContent>
+            </Tooltip>
           )}
+
+          {/* Delete Action Icon Button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteNode(node);
+                }}
+                className="h-5 w-5 rounded hover:bg-red-100 dark:hover:bg-red-950/60 text-slate-400 hover:text-red-600 opacity-60 group-hover:opacity-100 transition-all flex items-center justify-center shrink-0"
+              >
+                <Trash2 className="h-3.5 w-3.5 text-red-500" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="text-xs bg-red-900 text-white font-semibold">
+              Delete {isFolder ? "Folder" : "File"}
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -901,10 +1570,17 @@ function TreeNodeItem({
               node={child}
               level={level + 1}
               expandedIds={expandedIds}
+              draggedNodeId={draggedNodeId}
+              dropTargetFolderId={dropTargetFolderId}
               onToggleFolder={onToggleFolder}
               onFolderRightClick={onFolderRightClick}
               onPreview={onPreview}
               onSendApproval={onSendApproval}
+              onDeleteNode={onDeleteNode}
+              onDragStart={onDragStart}
+              onDragOver={onDragOver}
+              onDragLeave={onDragLeave}
+              onDrop={onDrop}
             />
           ))}
         </div>

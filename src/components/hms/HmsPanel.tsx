@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { compressImageFile } from "@/lib/utils";
 import {
   ArrowLeft,
   ChevronLeft,
@@ -2642,13 +2643,26 @@ function AddHelpView({
     return "text";
   }
 
-  function handleFile(f: File | null) {
+  async function handleFile(f: File | null) {
     if (!f) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setFile({ name: f.name, size: f.size, type: f.type, dataUrl: reader.result as string });
-    };
-    reader.readAsDataURL(f);
+    const ct = detectContentType(f.name, f.type);
+    let dataUrl = "";
+    if (ct === "image") {
+      try {
+        dataUrl = await compressImageFile(f);
+      } catch {
+        dataUrl = "";
+      }
+    }
+    if (!dataUrl) {
+      dataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string) || "");
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(f);
+      });
+    }
+    setFile({ name: f.name, size: f.size, type: f.type, dataUrl });
     if (!title) setTitle(f.name.replace(/\.[^.]+$/, ""));
   }
 
