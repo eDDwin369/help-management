@@ -322,6 +322,44 @@ export function HelpAdminRightClickModal() {
     posY: 0,
   });
 
+  // Resizing State & Session Storage Persistence
+  const [modalSize, setModalSize] = useState<{ width: number; height: number }>(() => {
+    if (typeof window === "undefined") return { width: 350, height: 440 };
+    try {
+      const saved = sessionStorage.getItem("help_admin_modal_size");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.width === "number" && typeof parsed.height === "number") {
+          return {
+            width: Math.max(280, Math.min(800, parsed.width)),
+            height: Math.max(320, Math.min(750, parsed.height)),
+          };
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load modal size from sessionStorage:", e);
+    }
+    return { width: 350, height: 440 };
+  });
+
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeStartRef = useRef<{ mouseX: number; mouseY: number; startW: number; startH: number }>({
+    mouseX: 0,
+    mouseY: 0,
+    startW: 350,
+    startH: 440,
+  });
+
+  // Save selected modal size to sessionStorage during the session
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      sessionStorage.setItem("help_admin_modal_size", JSON.stringify(modalSize));
+    } catch (e) {
+      console.error("Failed to save modal size to sessionStorage:", e);
+    }
+  }, [modalSize]);
+
   const modalRef = useRef<HTMLDivElement>(null);
 
   // Handle global right click to position and show modal
@@ -344,8 +382,8 @@ export function HelpAdminRightClickModal() {
 
       e.preventDefault();
 
-      const modalW = 350;
-      const modalH = 440;
+      const modalW = modalSize.width;
+      const modalH = modalSize.height;
       const x = Math.max(12, Math.min(e.clientX, window.innerWidth - modalW - 16));
       const y = Math.max(12, Math.min(e.clientY, window.innerHeight - modalH - 16));
 
@@ -356,7 +394,7 @@ export function HelpAdminRightClickModal() {
     };
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (isDragging || previewNode || addDialogOpen) return;
+      if (isDragging || isResizing || previewNode || addDialogOpen) return;
       const target = e.target as HTMLElement | null;
       if (target && (target.closest('[role="dialog"]') || target.closest('[role="menu"]'))) return;
       if (modalRef.current && !modalRef.current.contains(target as Node)) {
@@ -372,9 +410,9 @@ export function HelpAdminRightClickModal() {
       document.removeEventListener("contextmenu", handleContextMenu);
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isHelpAdmin, isDragging, previewNode, addDialogOpen]);
+  }, [isHelpAdmin, isDragging, isResizing, previewNode, addDialogOpen, modalSize]);
 
-  // Handle header dragging
+  // Handle header position dragging
   const handleHeaderMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest("button, input, a")) return;
     e.preventDefault();
@@ -397,8 +435,8 @@ export function HelpAdminRightClickModal() {
       rafId = requestAnimationFrame(() => {
         const dx = e.clientX - dragStartRef.current.mouseX;
         const dy = e.clientY - dragStartRef.current.mouseY;
-        const modalW = 350;
-        const modalH = 440;
+        const modalW = modalSize.width;
+        const modalH = modalSize.height;
         const nextX = Math.max(0, Math.min(window.innerWidth - modalW, dragStartRef.current.posX + dx));
         const nextY = Math.max(0, Math.min(window.innerHeight - modalH, dragStartRef.current.posY + dy));
         setPos({ x: nextX, y: nextY });
@@ -417,7 +455,57 @@ export function HelpAdminRightClickModal() {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isDragging]);
+  }, [isDragging, modalSize]);
+
+  // Handle bottom-right resize dragging
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    resizeStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      startW: modalSize.width,
+      startH: modalSize.height,
+    };
+    setIsResizing(true);
+  };
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    let rafId: number | null = null;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const dx = e.clientX - resizeStartRef.current.mouseX;
+        const dy = e.clientY - resizeStartRef.current.mouseY;
+
+        const minW = 280;
+        const maxW = Math.max(280, Math.min(800, window.innerWidth - pos.x - 12));
+        const minH = 320;
+        const maxH = Math.max(320, Math.min(750, window.innerHeight - pos.y - 12));
+
+        const newW = Math.max(minW, Math.min(maxW, resizeStartRef.current.startW + dx));
+        const newH = Math.max(minH, Math.min(maxH, resizeStartRef.current.startH + dy));
+
+        setModalSize({ width: newW, height: newH });
+      });
+    };
+
+    const handleMouseUp = () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      setIsResizing(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing, pos.x, pos.y]);
 
   // Toggle folder expansion
   const toggleFolder = (id: string) => {
@@ -797,10 +885,12 @@ export function HelpAdminRightClickModal() {
           transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`,
           top: 0,
           left: 0,
-          willChange: isDragging ? "transform" : "auto",
+          width: `${modalSize.width}px`,
+          height: `${modalSize.height}px`,
+          willChange: isDragging || isResizing ? "transform, width, height" : "auto",
         }}
-        className={`fixed z-50 w-[350px] max-w-[92vw] rounded-xl bg-card border border-border/80 shadow-2xl overflow-hidden text-card-foreground select-none flex flex-col font-sans ${
-          isDragging ? "transition-none" : "transition-transform duration-75 ease-out"
+        className={`fixed z-50 max-w-[95vw] max-h-[95vh] rounded-xl bg-card border border-border/80 shadow-2xl overflow-hidden text-card-foreground select-none flex flex-col font-sans ${
+          isDragging || isResizing ? "transition-none" : "transition-transform duration-75 ease-out"
         }`}
       >
         {/* Header Bar - Draggable */}
@@ -868,7 +958,7 @@ export function HelpAdminRightClickModal() {
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                onClick={() => openAddFolderModal(null)}
+                onClick={() => openAddModal(null)}
                 className="h-8 px-2.5 rounded-md bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-medium text-xs flex items-center justify-center gap-1 shadow-xs transition-all shrink-0"
               >
                 <Plus className="h-4 w-4 stroke-[2.5]" />
@@ -881,13 +971,13 @@ export function HelpAdminRightClickModal() {
         </div>
 
         {/* Tree Container / Main List Area */}
-        <div className="min-h-[220px] max-h-[280px] overflow-y-auto bg-white dark:bg-card divide-y divide-border/30 custom-scrollbar shrink-0">
+        <div className="flex-1 min-h-[160px] overflow-y-auto bg-white dark:bg-card divide-y divide-border/30 custom-scrollbar">
           {nodes.length === 0 ? (
             /* Requirement 1 & 3: Initially Empty with Info & Hover Tooltip */
             <Tooltip>
               <TooltipTrigger asChild>
                 <div
-                  onClick={() => openAddFolderModal(null)}
+                  onClick={() => openAddModal(null)}
                   className="py-12 px-4 text-center cursor-pointer group transition-colors hover:bg-blue-50/50 dark:hover:bg-blue-950/20"
                 >
                   <div className="h-10 w-10 mx-auto rounded-full bg-blue-100 dark:bg-blue-950/50 text-blue-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
@@ -936,21 +1026,47 @@ export function HelpAdminRightClickModal() {
           )}
         </div>
 
-        {/* Footer Bar */}
-        <div className="h-7 bg-slate-50 dark:bg-muted/30 px-3 border-t border-border/50 flex items-center justify-between text-[11px] text-muted-foreground shrink-0">
+        {/* Footer Bar with Drag-to-Resize Handle */}
+        <div className="h-7 bg-slate-50 dark:bg-muted/30 px-3 border-t border-border/50 flex items-center justify-between text-[11px] text-muted-foreground shrink-0 relative">
           <span className="font-medium text-slate-600 dark:text-slate-400">
             {nodes.length} folder{nodes.length === 1 ? "" : "s"} / item{nodes.length === 1 ? "" : "s"}
           </span>
-          <button
-            onClick={() => {
-              openPanel();
-              setVisible(false);
-            }}
-            className="hover:text-blue-600 hover:underline font-semibold flex items-center gap-1"
+
+          <div className="flex items-center gap-3 pr-2">
+            <button
+              onClick={() => {
+                openPanel();
+                setVisible(false);
+              }}
+              className="hover:text-blue-600 hover:underline font-semibold flex items-center gap-1"
+            >
+              <span>HMS Panel</span>
+              <ExternalLink className="h-3 w-3" />
+            </button>
+          </div>
+
+          {/* Visible Bottom-Right Resize Handle */}
+          <div
+            onMouseDown={handleResizeMouseDown}
+            className="absolute right-0.5 bottom-0.5 w-4 h-4 cursor-se-resize flex items-end justify-end p-0.5 z-20 group text-slate-400 hover:text-blue-600 active:text-blue-700 transition-colors"
+            title="Drag to resize modal"
           >
-            <span>HMS Panel</span>
-            <ExternalLink className="h-3 w-3" />
-          </button>
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 10 10"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="opacity-60 group-hover:opacity-100 group-active:opacity-100 transition-opacity"
+            >
+              <path
+                d="M8.5 1.5L1.5 8.5M8.5 5L5 8.5M8.5 8L8 8.5"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
         </div>
 
         {/* Right-Click Context Menu Floating Overlay */}
@@ -972,7 +1088,7 @@ export function HelpAdminRightClickModal() {
             {folderContextMenu.folderNode.kind === "folder" || folderContextMenu.folderNode.kind === "subfolder" ? (
               <>
                 <button
-                  onClick={() => openAddFolderModal(folderContextMenu.folderNode.id)}
+                  onClick={() => openAddModal(folderContextMenu.folderNode.id, "folder")}
                   className="w-full text-left px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2 text-foreground font-medium"
                 >
                   <FolderPlus className="h-3.5 w-3.5 text-amber-500" />
@@ -1142,7 +1258,7 @@ export function HelpAdminRightClickModal() {
           <DialogContent
             className={
               isFullscreen
-                ? "fixed inset-0 top-0 left-0 translate-x-0 translate-y-0 w-screen h-screen max-w-none max-h-none rounded-none z-[10000] p-6 bg-slate-950 text-white flex flex-col justify-between border-0 transition-all"
+                ? "fixed inset-0 w-screen h-screen max-w-none max-h-none rounded-none z-[10000] p-6 bg-slate-950 text-white flex flex-col justify-between border-0 transition-all"
                 : "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl transition-all z-[10000] p-5 bg-card text-card-foreground border border-border/80 shadow-2xl w-[90vw] max-w-xl"
             }
           >

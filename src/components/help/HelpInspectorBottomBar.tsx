@@ -62,47 +62,47 @@ export function HelpInspectorBottomBar() {
         </div>
 
         {/* Master Inspector Toggle Switch */}
-        <div className="flex items-center gap-2 bg-slate-900/60 px-2.5 py-1 rounded-full border border-slate-800/80">
+        <div className="flex items-center gap-2 bg-slate-900/60 px-3 py-1 rounded-full border border-slate-800/80 w-[148px] justify-between shrink-0">
           <Switch
             id="inspector-toggle"
             checked={isEnabled}
             onCheckedChange={setIsEnabled}
-            className="data-[state=checked]:bg-indigo-600 scale-90"
+            className="data-[state=checked]:bg-indigo-600 scale-90 shrink-0"
           />
           <label
             htmlFor="inspector-toggle"
-            className="text-xs font-medium cursor-pointer text-slate-300 select-none flex items-center gap-1"
+            className="text-xs font-medium cursor-pointer text-slate-300 select-none flex items-center gap-1 w-[92px] shrink-0"
           >
             {isEnabled ? (
               <span className="text-emerald-400 flex items-center gap-1">
-                <Eye className="h-3.5 w-3.5" /> Inspector ON
+                <Eye className="h-3.5 w-3.5 shrink-0" /> Inspector ON
               </span>
             ) : (
               <span className="text-slate-400 flex items-center gap-1">
-                <EyeOff className="h-3.5 w-3.5" /> OFF
+                <EyeOff className="h-3.5 w-3.5 shrink-0" /> Inspector OFF
               </span>
             )}
           </label>
         </div>
 
         {/* Visual Highlighting Pill */}
-        {isEnabled && (
-          <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-full border border-slate-800 shrink-0">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setMode("visual")}
-              className={`h-7 text-xs px-3 rounded-full transition-all duration-200 gap-1.5 ${
-                mode === "visual"
-                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold shadow-md"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800"
-              }`}
-            >
-              <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-              <span>Option 1: Visual Highlighting</span>
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-full border border-slate-800 shrink-0">
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={!isEnabled}
+            onClick={() => setMode("visual")}
+            className={`h-7 text-xs px-3 rounded-full transition-all duration-200 gap-1.5 ${
+              !isEnabled
+                ? "opacity-35 text-slate-500 cursor-not-allowed bg-slate-900/40"
+                : mode === "visual"
+                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold shadow-md"
+                : "text-slate-400 hover:text-white hover:bg-slate-800"
+            }`}
+          >
+            <span>Visual Highlighting</span>
+          </Button>
+        </div>
 
         {/* Refresh scanner button */}
         <Button

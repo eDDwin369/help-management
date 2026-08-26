@@ -77,6 +77,9 @@ export function HelpInspectorProvider({ children }: { children: ReactNode }) {
       const key = el.getAttribute("data-hms-context");
       if (!key) return;
 
+      // Exclude sidebar elements from help inspector scanning
+      if (el.closest("aside, .sidebar, [data-sidebar]")) return;
+
       // Ensure element is visible
       const rect = el.getBoundingClientRect();
       if (rect.width === 0 && rect.height === 0) return;

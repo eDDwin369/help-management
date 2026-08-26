@@ -26,7 +26,9 @@ export function VisualHelpHighlighter() {
 
   if (!isEnabled || mode !== "visual") return null;
 
-  const locationsWithHelp = locations.filter((l) => l.hasHelp);
+  const locationsWithHelp = locations.filter(
+    (l) => l.hasHelp && !l.element.closest("aside, .sidebar, [data-sidebar]")
+  );
 
   return (
     <div className="pointer-events-none fixed inset-0 z-40">
@@ -38,6 +40,14 @@ export function VisualHelpHighlighter() {
         // Viewport boundary checks
         const isNearTop = rect.top < 50;
         const popoverShowBelow = rect.top < 220;
+        const isNearRight = typeof window !== "undefined" && rect.right > window.innerWidth - 340;
+        const isNearLeft = rect.left < 160;
+
+        const horizontalPositionClass = isNearRight
+          ? "right-0 translate-x-0"
+          : isNearLeft
+          ? "left-0 translate-x-0"
+          : "left-1/2 -translate-x-1/2";
 
         return (
           <div
@@ -79,14 +89,13 @@ export function VisualHelpHighlighter() {
             >
               <Button
                 size="sm"
-                className="h-6 px-2 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white font-semibold text-[11px] shadow-lg hover:shadow-indigo-500/50 hover:scale-105 transition-all duration-200 gap-1 border border-white/30"
+                className="h-6 px-2 rounded-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white font-semibold text-[11px] shadow-lg hover:shadow-indigo-500/50 hover:scale-105 transition-all duration-200 border border-white/30"
                 onClick={(e) => {
                   e.stopPropagation();
                   setActiveKey((prev) => (prev === contextKey ? null : contextKey));
                 }}
               >
-                <Sparkles className="h-3 w-3 text-amber-300 animate-spin" style={{ animationDuration: "3s" }} />
-                <span className="ml-0.5 rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] font-bold">
+                <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] font-bold">
                   {articles.length}
                 </span>
               </Button>
@@ -95,17 +104,17 @@ export function VisualHelpHighlighter() {
             {/* Click Micro-Card Tooltip (Elevated to z-[10000]) */}
             {isActive && (
               <div
-                className={`absolute left-1/2 -translate-x-1/2 w-72 rounded-xl bg-slate-950/95 backdrop-blur-xl p-3 text-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.7)] border border-indigo-500/50 z-[10000] animate-in fade-in zoom-in-95 duration-150 pointer-events-auto ${
+                className={`absolute w-84 min-w-[320px] max-w-[90vw] rounded-xl bg-slate-950/95 backdrop-blur-xl p-3 text-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.7)] border border-indigo-500/50 z-[10000] animate-in fade-in zoom-in-95 duration-150 pointer-events-auto ${horizontalPositionClass} ${
                   popoverShowBelow ? "top-full mt-2" : "bottom-full mb-2"
                 }`}
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex items-center justify-between border-b pb-2 mb-2 border-slate-800">
-                  <div className="flex items-center gap-1.5">
-                    <HelpCircle className="h-4 w-4 text-indigo-400" />
-                    <span className="font-semibold text-xs truncate max-w-[170px] text-white">{label}</span>
+                <div className="flex items-center justify-between border-b pb-2 mb-2 border-slate-800 gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <HelpCircle className="h-4 w-4 text-indigo-400 shrink-0" />
+                    <span className="font-semibold text-xs truncate text-white">{label}</span>
                   </div>
-                  <Badge variant="outline" className="text-[10px] border-indigo-500/30 text-indigo-300 bg-indigo-500/10">
+                  <Badge variant="outline" className="text-[10px] border-indigo-500/30 text-indigo-300 bg-indigo-500/10 shrink-0 whitespace-nowrap">
                     {articles.length} Attached
                   </Badge>
                 </div>
