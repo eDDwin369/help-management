@@ -18,7 +18,6 @@ import {
   Search,
   Plus,
   X,
-  MoreVertical,
   FileText,
   Folder,
   FolderPlus,
@@ -38,20 +37,12 @@ import {
   Upload,
   ZoomIn,
   ZoomOut,
-  RotateCcw,
   Hand,
   Camera,
   Maximize2,
   Minimize2,
+  RotateCcw,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
@@ -216,7 +207,7 @@ export function HelpAdminRightClickModal() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Preview Dialog & Toolbar Control States (Zoom, Pan, Fullscreen, Screenshot)
+  // Preview Dialog & Floating Pill Controls State (Zoom, Pan, Fullscreen, Snapshot)
   const [previewNode, setPreviewNode] = useState<HelpAdminNode | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -228,14 +219,14 @@ export function HelpAdminRightClickModal() {
   // Open Preview Modal & Reset Viewport controls
   const handleOpenPreview = (node: HelpAdminNode) => {
     setVisible(true);
-    const resolvedUrl =
+    const mediaUrl =
       node.contentUrl && node.contentUrl.length > 50
         ? node.contentUrl
         : SAMPLE_MEDIA[node.kind] || SAMPLE_MEDIA.image;
 
     setPreviewNode({
       ...node,
-      contentUrl: resolvedUrl,
+      contentUrl: mediaUrl,
     });
     setZoomLevel(1.0);
     setPanOffset({ x: 0, y: 0 });
@@ -251,23 +242,68 @@ export function HelpAdminRightClickModal() {
     setPanOffset({ x: 0, y: 0 });
   };
   const togglePanMode = () => setIsPanActive((prev) => !prev);
-  const toggleFullscreen = () => setIsFullscreen((prev) => !prev);
 
-  // Take Screenshot / Save Media Function
+  // Native HTML5 Fullscreen API Toggle (Hides browser tabs, URL bar & OS taskbar)
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        if (document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+        }
+        setIsFullscreen(true);
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        }
+        setIsFullscreen(false);
+      }
+    } catch (err) {
+      console.warn("Fullscreen API fallback triggered:", err);
+      setIsFullscreen((prev) => !prev);
+    }
+  };
+
+  // Sync Native Fullscreen API changes & Esc Key Listener
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && (isFullscreen || document.fullscreenElement)) {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+        setIsFullscreen(false);
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isFullscreen]);
+
+  // Take Snapshot / Save Media Function
   const handleTakeScreenshot = () => {
     if (!previewNode) return;
     const mediaUrl = previewNode.contentUrl || SAMPLE_MEDIA[previewNode.kind] || SAMPLE_MEDIA.image;
 
     const a = document.createElement("a");
     a.href = mediaUrl;
-    a.download = `${previewNode.name.toLowerCase().replace(/\s+/g, "_")}_preview.${
+    a.download = `${previewNode.name.toLowerCase().replace(/\s+/g, "_")}_snapshot.${
       previewNode.kind === "pdf" ? "pdf" : previewNode.kind === "video" ? "mp4" : "png"
     }`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
 
-    toast.success(`Screenshot / Preview saved for "${previewNode.name}"!`);
+    toast.success(`Snapshot saved for "${previewNode.name}"!`);
   };
 
   // Folder Right-Click Context Menu State
@@ -828,34 +864,6 @@ export function HelpAdminRightClickModal() {
             />
           </div>
 
-          {/* Options Dropdown Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className="h-8 w-7 rounded-md hover:bg-muted/70 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                title="Options"
-              >
-                <MoreVertical className="h-4 w-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-48 text-xs">
-              <DropdownMenuLabel>Help Admin Actions</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => openAddFolderModal(null)}>
-                <FolderPlus className="mr-2 h-3.5 w-3.5 text-amber-500" />
-                Create Main Folder
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => triggerDirectFileUpload(null)}>
-                <Upload className="mr-2 h-3.5 w-3.5 text-blue-600" />
-                Upload Help File
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { openPanel(); setVisible(false); }}>
-                <Sparkles className="mr-2 h-3.5 w-3.5 text-indigo-500" />
-                Open Full HMS Panel
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
           {/* + Button with Hover Info Tooltip */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -915,7 +923,7 @@ export function HelpAdminRightClickModal() {
                   dropTargetFolderId={dropTargetFolderId}
                   onToggleFolder={toggleFolder}
                   onFolderRightClick={handleNodeRightClick}
-                  onPreview={(n) => handleOpenPreview(n)}
+                  onPreview={handleOpenPreview}
                   onSendApproval={handleSendApproval}
                   onDeleteNode={handleDeleteNode}
                   onDragStart={handleDragStart}
@@ -980,16 +988,6 @@ export function HelpAdminRightClickModal() {
               </>
             ) : (
               <>
-                <button
-                  onClick={() => {
-                    handleOpenPreview(folderContextMenu.folderNode);
-                    setFolderContextMenu(null);
-                  }}
-                  className="w-full text-left px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2 text-foreground font-medium"
-                >
-                  <Eye className="h-3.5 w-3.5 text-blue-500" />
-                  Preview File
-                </button>
                 {folderContextMenu.folderNode.approvalStatus !== "approved" && (
                   <button
                     onClick={() => {
@@ -1127,7 +1125,7 @@ export function HelpAdminRightClickModal() {
         </DialogContent>
       </Dialog>
 
-      {/* File Preview Modal */}
+      {/* File Content Preview Dialog */}
       {previewNode && (
         <Dialog
           open={!!previewNode}
@@ -1135,39 +1133,26 @@ export function HelpAdminRightClickModal() {
             if (!open) {
               setPreviewNode(null);
               setIsFullscreen(false);
+              if (document.fullscreenElement && document.exitFullscreen) {
+                document.exitFullscreen().catch(() => {});
+              }
             }
           }}
         >
           <DialogContent
-            className={`rounded-2xl transition-all relative z-[10000] ${
-              isFullscreen ? "max-w-5xl w-[95vw] h-[90vh] max-h-[90vh] flex flex-col" : "max-w-xl"
-            }`}
+            className={
+              isFullscreen
+                ? "fixed inset-0 top-0 left-0 translate-x-0 translate-y-0 w-screen h-screen max-w-none max-h-none rounded-none z-[10000] p-6 bg-slate-950 text-white flex flex-col justify-between border-0 transition-all"
+                : "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl transition-all z-[10000] p-5 bg-card text-card-foreground border border-border/80 shadow-2xl w-[90vw] max-w-xl"
+            }
           >
-            {/* Apple-Style UI Floating Navigation Glassmorphic Pill Bar OUTSIDE Top of Modal */}
-            <div className="absolute -top-14 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/90 dark:bg-slate-950/95 backdrop-blur-xl border border-white/20 shadow-2xl text-white text-xs select-none animate-in fade-in slide-in-from-bottom-3 duration-200">
-              {/* Zoom Out */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={handleZoomOut}
-                    disabled={zoomLevel <= 0.5}
-                    className="p-1.5 rounded-full hover:bg-white/20 active:scale-95 disabled:opacity-40 transition-all text-white"
-                  >
-                    <ZoomOut className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs bg-slate-950 text-white border border-white/10 font-semibold">
-                  Zoom Out
-                </TooltipContent>
-              </Tooltip>
-
-              {/* Zoom Percentage Badge */}
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white/15 text-slate-100 min-w-[46px] text-center">
-                {Math.round(zoomLevel * 100)}%
-              </span>
-
-              {/* Zoom In */}
+            {/* Sleek Dark Floating Navigation Pill Bar */}
+            <div
+              className={`absolute left-1/2 -translate-x-1/2 z-[70] flex items-center gap-2.5 px-4 py-2 rounded-full bg-[#18181B] dark:bg-slate-950/95 backdrop-blur-xl border border-white/20 shadow-2xl text-white text-xs select-none animate-in fade-in slide-in-from-bottom-3 duration-200 ${
+                isFullscreen ? "top-4" : "-top-14"
+              }`}
+            >
+              {/* 1. Zoom In */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -1184,15 +1169,33 @@ export function HelpAdminRightClickModal() {
                 </TooltipContent>
               </Tooltip>
 
-              {/* Reset View */}
+              {/* 2. Zoom Out */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleZoomOut}
+                    disabled={zoomLevel <= 0.5}
+                    className="p-1.5 rounded-full hover:bg-white/20 active:scale-95 disabled:opacity-40 transition-all text-white"
+                  >
+                    <ZoomOut className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs bg-slate-950 text-white border border-white/10 font-semibold">
+                  Zoom Out
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Zoom Percentage / Reset */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
                     onClick={handleResetZoom}
-                    className="p-1.5 rounded-full hover:bg-white/20 active:scale-95 transition-all text-white"
+                    className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/15 hover:bg-white/25 text-slate-100 min-w-[42px] text-center transition-all flex items-center gap-1"
                   >
-                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span>{Math.round(zoomLevel * 100)}%</span>
+                    {zoomLevel !== 1.0 && <RotateCcw className="h-3 w-3 text-slate-300" />}
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs bg-slate-950 text-white border border-white/10 font-semibold">
@@ -1200,55 +1203,37 @@ export function HelpAdminRightClickModal() {
                 </TooltipContent>
               </Tooltip>
 
-              <div className="h-4 w-px bg-white/20 mx-1" />
+              <div className="h-4 w-px bg-white/20 mx-0.5" />
 
-              {/* Pan Mode */}
+              {/* 3. Pan Mode (Circular Blue Highlighted Button like Reference Image 1) */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
                     onClick={togglePanMode}
-                    className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 transition-all ${
+                    className={`p-2 rounded-full transition-all flex items-center justify-center ${
                       isPanActive
-                        ? "bg-blue-600 text-white shadow-md shadow-blue-500/40"
+                        ? "bg-blue-600 text-white shadow-lg shadow-blue-500/50 scale-105"
                         : "hover:bg-white/20 text-slate-200"
                     }`}
                   >
-                    <Hand className="h-3.5 w-3.5" />
-                    <span>Pan</span>
+                    <Hand className="h-4 w-4" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs bg-slate-950 text-white border border-white/10 font-semibold">
-                  {isPanActive ? "Pan Active (Click & Drag)" : "Enable Pan Mode"}
+                  {isPanActive ? "Pan Active (Click & Drag Image)" : "Enable Pan Mode"}
                 </TooltipContent>
               </Tooltip>
 
-              <div className="h-4 w-px bg-white/20 mx-1" />
+              <div className="h-4 w-px bg-white/20 mx-0.5" />
 
-              {/* Screenshot */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={handleTakeScreenshot}
-                    className="px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 hover:bg-white/20 text-slate-200 transition-all"
-                  >
-                    <Camera className="h-3.5 w-3.5 text-blue-400" />
-                    <span>Screenshot</span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs bg-slate-950 text-white border border-white/10 font-semibold">
-                  Take Screenshot / Download
-                </TooltipContent>
-              </Tooltip>
-
-              {/* Fullscreen */}
+              {/* 4. Fullscreen */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
                     onClick={toggleFullscreen}
-                    className="p-1.5 rounded-full hover:bg-white/20 active:scale-95 transition-all text-white ml-0.5"
+                    className="p-1.5 rounded-full hover:bg-white/20 active:scale-95 transition-all text-white"
                   >
                     {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                   </button>
@@ -1257,23 +1242,33 @@ export function HelpAdminRightClickModal() {
                   {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
                 </TooltipContent>
               </Tooltip>
+
+              {/* 5. Snapshot */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={handleTakeScreenshot}
+                    className="p-1.5 rounded-full hover:bg-white/20 active:scale-95 transition-all text-blue-400 hover:text-blue-300"
+                  >
+                    <Camera className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs bg-slate-950 text-white border border-white/10 font-semibold">
+                  Snapshot / Download Asset
+                </TooltipContent>
+              </Tooltip>
             </div>
 
-            <DialogHeader className="border-b pb-2 shrink-0">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <DialogTitle className="text-base font-bold flex items-center gap-2">
-                    {previewNode.kind === "pdf" && <FileText className="h-4 w-4 text-blue-600" />}
-                    {previewNode.kind === "image" && <ImageIcon className="h-4 w-4 text-emerald-600" />}
-                    {previewNode.kind === "video" && <Video className="h-4 w-4 text-rose-600" />}
-                    {previewNode.kind === "text" && <FileText className="h-4 w-4 text-purple-600" />}
-                    {previewNode.name}
-                  </DialogTitle>
-                  <DialogDescription className="text-xs mt-0.5">
-                    Added by {previewNode.owner} • {previewNode.modified}
-                  </DialogDescription>
-                </div>
-
+            <DialogHeader className="border-b pb-3 shrink-0">
+              <div className="flex items-center justify-between pr-6">
+                <DialogTitle className="text-base font-bold flex items-center gap-2">
+                  {previewNode.kind === "pdf" && <FileText className="h-4 w-4 text-blue-600" />}
+                  {previewNode.kind === "image" && <ImageIcon className="h-4 w-4 text-emerald-600" />}
+                  {previewNode.kind === "video" && <Video className="h-4 w-4 text-rose-600" />}
+                  {previewNode.kind === "text" && <FileText className="h-4 w-4 text-purple-600" />}
+                  <span>{previewNode.name}</span>
+                </DialogTitle>
                 <Badge
                   variant="outline"
                   className={`text-[10px] capitalize ${
@@ -1287,9 +1282,12 @@ export function HelpAdminRightClickModal() {
                   {previewNode.approvalStatus}
                 </Badge>
               </div>
+              <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                Added by {previewNode.owner} • {previewNode.modified}
+              </DialogDescription>
             </DialogHeader>
 
-            {/* Interactive Media Canvas Container with Zoom & Pan */}
+            {/* Interactive Viewport Area with Zoom & Pan handlers */}
             <div className="py-2 flex-1 min-h-0 overflow-hidden">
               <div
                 className={`relative rounded-xl overflow-hidden border border-border bg-slate-900/5 flex items-center justify-center transition-all ${
@@ -1360,25 +1358,19 @@ export function HelpAdminRightClickModal() {
               </div>
             </div>
 
-            {/* Footer Action: Send Approval to Superadmin */}
-            <div className="flex items-center justify-between pt-2 border-t shrink-0">
-              <span className="text-xs text-muted-foreground">
-                Status: <span className="font-semibold capitalize text-foreground">{previewNode.approvalStatus}</span>
+            <div className="flex items-center justify-between pt-2 border-t text-xs shrink-0">
+              <span className="text-muted-foreground">
+                Type: <span className="font-semibold text-foreground uppercase">{previewNode.kind}</span>
               </span>
-
-              {previewNode.approvalStatus !== "approved" && (
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    handleSendApproval(previewNode);
-                    setPreviewNode(null);
-                  }}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white gap-1.5 text-xs"
-                >
-                  <Send className="h-3.5 w-3.5" />
-                  Send Approval to Superadmin
-                </Button>
-              )}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs"
+                onClick={() => setPreviewNode(null)}
+              >
+                Close Preview
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -1446,7 +1438,7 @@ function TreeNodeItem({
       >
         <div
           onClick={() => (isFolder ? onToggleFolder(node.id) : onPreview(node))}
-          className="flex items-center gap-2 min-w-0 flex-1"
+          className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
         >
           {isFolder ? (
             <>
@@ -1501,13 +1493,13 @@ function TreeNodeItem({
                     e.stopPropagation();
                     onPreview(node);
                   }}
-                  className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground opacity-60 group-hover:opacity-100 transition-opacity"
+                  className="h-5 w-5 rounded hover:bg-blue-100 dark:hover:bg-blue-950/60 text-slate-400 hover:text-blue-600 opacity-60 group-hover:opacity-100 transition-all flex items-center justify-center shrink-0"
                 >
                   <Eye className="h-3.5 w-3.5" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top" className="text-xs bg-slate-900 text-white font-semibold">
-                Preview
+                Preview Content
               </TooltipContent>
             </Tooltip>
           )}
