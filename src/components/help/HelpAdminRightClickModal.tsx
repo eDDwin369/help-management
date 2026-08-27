@@ -25,11 +25,7 @@ import {
   Video,
   Eye,
   Send,
-  CheckCircle2,
-  Clock,
-  Sparkles,
   ExternalLink,
-  Filter,
   ChevronRight,
   ChevronDown,
   Info,
@@ -42,6 +38,13 @@ import {
   Maximize2,
   Minimize2,
   RotateCcw,
+  List,
+  LayoutGrid,
+  ChevronsDown,
+  ChevronsUp,
+  Home,
+  Clock,
+  CheckCircle2,
 } from "lucide-react";
 import {
   Tooltip,
@@ -184,9 +187,68 @@ export function HelpAdminRightClickModal() {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [search, setSearch] = useState("");
 
-  // Tree nodes loaded from localStorage so created folders persist across page refreshes
   const [nodes, setNodes] = useState<HelpAdminNode[]>(() => loadSavedNodes());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+
+  // Recursively collect all folder IDs for Explode All functionality
+  const getAllFolderIds = (list: HelpAdminNode[]): string[] => {
+    let ids: string[] = [];
+    for (const node of list) {
+      if (node.kind === "folder" || node.kind === "subfolder") {
+        ids.push(node.id);
+        if (node.children && node.children.length > 0) {
+          ids = ids.concat(getAllFolderIds(node.children));
+        }
+      }
+    }
+    return ids;
+  };
+
+  const allFolderIds = useMemo(() => getAllFolderIds(nodes), [nodes]);
+  const isAllExploded = allFolderIds.length > 0 && allFolderIds.every((id) => expandedIds.has(id));
+
+  const handleExplodeAll = () => {
+    if (isAllExploded) {
+      setExpandedIds(new Set());
+      toast.info("Collapsed all folders");
+    } else {
+      setExpandedIds(new Set(allFolderIds));
+      toast.success("Exploded / Expanded all folders and content!");
+    }
+  };
+
+  // Breadcrumb navigation state (selected active folder/item path)
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+
+  // Compute breadcrumb trail matching the user's attached design (Home Icon › Root Name › Subfolder › File)
+  const breadcrumbs = useMemo(() => {
+    const rootName = context && context !== "Workspace" ? context : "My Drawings";
+    const trail: { id: string | null; name: string }[] = [{ id: null, name: rootName }];
+    if (!currentFolderId) return trail;
+
+    const findPath = (
+      list: HelpAdminNode[],
+      targetId: string,
+      currentPath: { id: string; name: string }[]
+    ): { id: string; name: string }[] | null => {
+      for (const node of list) {
+        const newPath = [...currentPath, { id: node.id, name: node.name }];
+        if (node.id === targetId) return newPath;
+        if (node.children && node.children.length > 0) {
+          const res = findPath(node.children, targetId, newPath);
+          if (res) return res;
+        }
+      }
+      return null;
+    };
+
+    const path = findPath(nodes, currentFolderId, []);
+    if (path) {
+      return [...trail, ...path];
+    }
+    return trail;
+  }, [nodes, currentFolderId, context]);
 
   // Persist nodes to localStorage whenever changed
   useEffect(() => {
@@ -343,6 +405,7 @@ export function HelpAdminRightClickModal() {
   });
 
   const [isResizing, setIsResizing] = useState(false);
+  const [isModalExpanded, setIsModalExpanded] = useState(false);
   const resizeStartRef = useRef<{ mouseX: number; mouseY: number; startW: number; startH: number }>({
     mouseX: 0,
     mouseY: 0,
@@ -875,29 +938,71 @@ export function HelpAdminRightClickModal() {
 
   const filteredNodes = useMemo(() => filterTree(nodes, search.trim().toLowerCase()), [nodes, search]);
 
+  // Determine nodes to display in Grid View based on currentFolderId selection
+  const gridDisplayNodes = useMemo(() => {
+    if (!currentFolderId) {
+      return filteredNodes;
+    }
+
+    const findFolder = (list: HelpAdminNode[]): HelpAdminNode | null => {
+      for (const n of list) {
+        if (n.id === currentFolderId) return n;
+        if (n.children && n.children.length > 0) {
+          const res = findFolder(n.children);
+          if (res) return res;
+        }
+      }
+      return null;
+    };
+
+    const targetFolder = findFolder(nodes);
+    if (!targetFolder || !targetFolder.children) return [];
+
+    let children = targetFolder.children;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      children = children.filter(
+        (n) => n.name.toLowerCase().includes(q) || n.description?.toLowerCase().includes(q)
+      );
+    }
+    return children;
+  }, [nodes, filteredNodes, currentFolderId, search]);
+
   if ((!visible && !previewNode && !addDialogOpen) || !isHelpAdmin) return null;
 
   return (
     <TooltipProvider delayDuration={150}>
       <div
         ref={modalRef}
-        style={{
-          transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`,
-          top: 0,
-          left: 0,
-          width: `${modalSize.width}px`,
-          height: `${modalSize.height}px`,
-          willChange: isDragging || isResizing ? "transform, width, height" : "auto",
-        }}
-        className={`fixed z-50 max-w-[95vw] max-h-[95vh] rounded-xl bg-card border border-border/80 shadow-2xl overflow-hidden text-card-foreground select-none flex flex-col font-sans ${
-          isDragging || isResizing ? "transition-none" : "transition-transform duration-75 ease-out"
+        style={
+          isModalExpanded
+            ? {
+                position: "fixed",
+                top: "16px",
+                left: "16px",
+                right: "16px",
+                bottom: "16px",
+                width: "calc(100vw - 32px)",
+                height: "calc(100vh - 32px)",
+              }
+            : {
+                transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`,
+                top: 0,
+                left: 0,
+                width: `${modalSize.width}px`,
+                height: `${modalSize.height}px`,
+                willChange: isDragging || isResizing ? "transform, width, height" : "auto",
+              }
+        }
+        className={`fixed z-50 rounded-xl bg-card border border-border/80 shadow-2xl overflow-hidden text-card-foreground select-none flex flex-col font-sans transition-all duration-200 ${
+          isDragging || isResizing ? "transition-none" : ""
         }`}
       >
         {/* Header Bar - Draggable */}
         <div
-          onMouseDown={handleHeaderMouseDown}
+          onMouseDown={isModalExpanded ? undefined : handleHeaderMouseDown}
           className={`h-11 bg-[#0F172A] px-3.5 flex items-center justify-between shrink-0 text-white border-b border-slate-800 ${
-            isDragging ? "cursor-grabbing" : "cursor-grab"
+            isModalExpanded ? "cursor-default" : isDragging ? "cursor-grabbing" : "cursor-grab"
           }`}
         >
           <div className="flex items-center gap-2.5 min-w-0">
@@ -931,19 +1036,46 @@ export function HelpAdminRightClickModal() {
             </Tooltip>
           </div>
 
-          <button
-            onClick={() => setVisible(false)}
-            className="h-6 w-6 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
-            title="Close"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Expand to Page / Restore Window Toggle Icon */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsModalExpanded((prev) => !prev);
+                  }}
+                  className="h-6 w-6 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+                  title={isModalExpanded ? "Restore floating window" : "Expand to page view"}
+                >
+                  {isModalExpanded ? (
+                    <Minimize2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs bg-slate-900 text-white font-semibold">
+                {isModalExpanded ? "Restore window view" : "Expand to full page view"}
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Close Button */}
+            <button
+              onClick={() => setVisible(false)}
+              className="h-6 w-6 rounded-md hover:bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-colors"
+              title="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Controls Row */}
-        <div className="p-2.5 bg-white dark:bg-card border-b border-border/60 flex items-center gap-2 shrink-0">
+        <div className="p-2.5 bg-white dark:bg-card border-b border-border/60 flex items-center justify-between gap-2 shrink-0">
           {/* Search Input */}
-          <div className="relative flex-1 min-w-0">
+          <div className={`relative min-w-0 transition-all ${isModalExpanded ? "w-72 max-w-xs" : "flex-1"}`}>
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <input
               type="text"
@@ -954,20 +1086,115 @@ export function HelpAdminRightClickModal() {
             />
           </div>
 
-          {/* + Button with Hover Info Tooltip */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => openAddModal(null)}
-                className="h-8 px-2.5 rounded-md bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-medium text-xs flex items-center justify-center gap-1 shadow-xs transition-all shrink-0"
-              >
-                <Plus className="h-4 w-4 stroke-[2.5]" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs bg-slate-900 text-white font-semibold">
-              Click + to create folder
-            </TooltipContent>
-          </Tooltip>
+          <div className="flex items-center gap-1 shrink-0">
+            {isModalExpanded && (
+              <>
+                {/* 1. List View Icon */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("list")}
+                      className={`h-8 w-8 rounded-md flex items-center justify-center transition-all ${
+                        viewMode === "list"
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <List className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs bg-slate-900 text-white font-semibold">
+                    List View
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* 2. Grid View Icon */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("grid")}
+                      className={`h-8 w-8 rounded-md flex items-center justify-center transition-all ${
+                        viewMode === "grid"
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <LayoutGrid className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs bg-slate-900 text-white font-semibold">
+                    Grid View
+                  </TooltipContent>
+                </Tooltip>
+              </>
+            )}
+
+            {/* 3. Explode / Expand All Folders Icon */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={handleExplodeAll}
+                  className={`h-8 w-8 rounded-md flex items-center justify-center transition-all ${
+                    isAllExploded
+                      ? "bg-amber-500 text-white shadow-xs"
+                      : "bg-muted/40 hover:bg-muted text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {isAllExploded ? <ChevronsUp className="h-4 w-4" /> : <ChevronsDown className="h-4 w-4" />}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs bg-slate-900 text-white font-semibold">
+                {isAllExploded ? "Collapse All Folders" : "Explode All Folders & Content"}
+              </TooltipContent>
+            </Tooltip>
+
+            {/* + Button with Hover Info Tooltip */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => openAddModal(null)}
+                  className="h-8 px-2.5 rounded-md bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-medium text-xs flex items-center justify-center gap-1 shadow-xs transition-all shrink-0"
+                >
+                  <Plus className="h-4 w-4 stroke-[2.5]" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs bg-slate-900 text-white font-semibold">
+                Click + to create folder
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+
+        {/* Breadcrumbs Navigation Bar (Matching Reference Image) */}
+        <div className="px-3.5 py-1.5 bg-slate-100/80 dark:bg-muted/30 border-b border-border/50 flex items-center gap-1.5 text-xs text-muted-foreground overflow-x-auto custom-scrollbar shrink-0 select-none">
+          {breadcrumbs.map((item, index) => {
+            const isLast = index === breadcrumbs.length - 1;
+            return (
+              <div key={item.id ?? "root"} className="flex items-center gap-1.5 shrink-0">
+                {index > 0 && <span className="text-slate-400 font-medium">›</span>}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentFolderId(item.id);
+                    if (item.id) {
+                      setExpandedIds((prev) => new Set(prev).add(item.id!));
+                    }
+                  }}
+                  className={`flex items-center gap-1.5 transition-colors ${
+                    isLast
+                      ? "font-bold text-foreground cursor-default"
+                      : "text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:underline cursor-pointer"
+                  }`}
+                >
+                  {index === 0 && <Home className="h-3.5 w-3.5 text-slate-800 dark:text-slate-200 fill-slate-800/10 shrink-0" />}
+                  <span>{item.name}</span>
+                </button>
+              </div>
+            );
+          })}
         </div>
 
         {/* Tree Container / Main List Area */}
@@ -997,6 +1224,32 @@ export function HelpAdminRightClickModal() {
             <div className="py-10 text-center text-xs text-muted-foreground">
               No matching folders or items found.
             </div>
+          ) : isModalExpanded && viewMode === "grid" ? (
+            gridDisplayNodes.length === 0 ? (
+              <div className="py-12 px-4 text-center text-xs text-muted-foreground flex flex-col items-center justify-center gap-2">
+                <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center">
+                  <Folder className="h-5 w-5 fill-amber-500/20" />
+                </div>
+                <span className="font-bold text-foreground">This folder is empty</span>
+                <p className="text-[11px] text-muted-foreground max-w-[220px]">
+                  Click the <span className="font-semibold text-blue-600">+</span> button to add a file or subfolder inside this folder.
+                </p>
+              </div>
+            ) : (
+              <div className="p-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                {gridDisplayNodes.map((node) => (
+                  <GridNodeItem
+                    key={node.id}
+                    node={node}
+                    onPreview={handleOpenPreview}
+                    onSendApproval={handleSendApproval}
+                    onDeleteNode={handleDeleteNode}
+                    onFolderRightClick={handleNodeRightClick}
+                    onSelectFolder={(id) => setCurrentFolderId(id)}
+                  />
+                ))}
+              </div>
+            )
           ) : (
             <div
               className="p-1 space-y-0.5"
@@ -1020,6 +1273,7 @@ export function HelpAdminRightClickModal() {
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
+                  onSelectFolder={(id) => setCurrentFolderId(id)}
                 />
               ))}
             </div>
@@ -1046,27 +1300,29 @@ export function HelpAdminRightClickModal() {
           </div>
 
           {/* Visible Bottom-Right Resize Handle */}
-          <div
-            onMouseDown={handleResizeMouseDown}
-            className="absolute right-0.5 bottom-0.5 w-4 h-4 cursor-se-resize flex items-end justify-end p-0.5 z-20 group text-slate-400 hover:text-blue-600 active:text-blue-700 transition-colors"
-            title="Drag to resize modal"
-          >
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 10 10"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="opacity-60 group-hover:opacity-100 group-active:opacity-100 transition-opacity"
+          {!isModalExpanded && (
+            <div
+              onMouseDown={handleResizeMouseDown}
+              className="absolute right-0.5 bottom-0.5 w-4 h-4 cursor-se-resize flex items-end justify-end p-0.5 z-20 group text-slate-400 hover:text-blue-600 active:text-blue-700 transition-colors"
+              title="Drag to resize modal"
             >
-              <path
-                d="M8.5 1.5L1.5 8.5M8.5 5L5 8.5M8.5 8L8 8.5"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 10 10"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="opacity-60 group-hover:opacity-100 group-active:opacity-100 transition-opacity"
+              >
+                <path
+                  d="M8.5 1.5L1.5 8.5M8.5 5L5 8.5M8.5 8L8 8.5"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+          )}
         </div>
 
         {/* Right-Click Context Menu Floating Overlay */}
@@ -1206,7 +1462,7 @@ export function HelpAdminRightClickModal() {
                 <Input
                   placeholder="e.g. Site Recordings Manual"
                   value={itemName}
-                  onChange={(e) => setItemName(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setItemName(e.target.value)}
                   className="h-8 text-xs"
                   autoFocus
                 />
@@ -1511,6 +1767,7 @@ function TreeNodeItem({
   onDragOver,
   onDragLeave,
   onDrop,
+  onSelectFolder,
 }: {
   node: HelpAdminNode;
   level: number;
@@ -1526,6 +1783,7 @@ function TreeNodeItem({
   onDragOver: (e: React.DragEvent, n: HelpAdminNode) => void;
   onDragLeave: (e: React.DragEvent, n: HelpAdminNode) => void;
   onDrop: (e: React.DragEvent, targetFolderId: string | null) => void;
+  onSelectFolder?: (id: string) => void;
 }) {
   const isFolder = node.kind === "folder" || node.kind === "subfolder";
   const isExpanded = expandedIds.has(node.id);
@@ -1553,7 +1811,11 @@ function TreeNodeItem({
         }`}
       >
         <div
-          onClick={() => (isFolder ? onToggleFolder(node.id) : onPreview(node))}
+          onClick={() => {
+            onSelectFolder?.(node.id);
+            if (isFolder) onToggleFolder(node.id);
+            else onPreview(node);
+          }}
           className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer"
         >
           {isFolder ? (
@@ -1689,10 +1951,113 @@ function TreeNodeItem({
               onDragOver={onDragOver}
               onDragLeave={onDragLeave}
               onDrop={onDrop}
+              onSelectFolder={onSelectFolder}
             />
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// Grid Node Item Component for Grid View rendering (Matching reference image)
+function GridNodeItem({
+  node,
+  onPreview,
+  onSendApproval,
+  onDeleteNode,
+  onFolderRightClick,
+  onSelectFolder,
+}: {
+  node: HelpAdminNode;
+  onPreview: (node: HelpAdminNode) => void;
+  onSendApproval: (node: HelpAdminNode) => void;
+  onDeleteNode: (node: HelpAdminNode) => void;
+  onFolderRightClick: (e: React.MouseEvent, node: HelpAdminNode) => void;
+  onSelectFolder?: (id: string) => void;
+}) {
+  const isFolder = node.kind === "folder" || node.kind === "subfolder";
+
+  return (
+    <div
+      onClick={() => {
+        if (isFolder) {
+          onSelectFolder?.(node.id);
+        } else {
+          onPreview(node);
+        }
+      }}
+      onContextMenu={(e) => onFolderRightClick(e, node)}
+      className="group relative rounded-[16px] border border-border/80 bg-white dark:bg-card hover:border-blue-600 hover:shadow-md transition-all flex flex-col justify-between overflow-hidden select-none cursor-pointer w-full h-[225px]"
+    >
+      {/* Top Preview Box */}
+      <div className="h-[140px] w-full bg-[#F1F5F9] dark:bg-muted/40 relative flex items-center justify-center p-2 rounded-t-[15px] border-b border-border/40 overflow-hidden group-hover:bg-[#E2E8F0] transition-colors">
+        {/* Top-Left Level Badge */}
+        <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-full bg-[#FFEDD5] text-[#EA580C] text-[9px] font-bold tracking-tight border border-orange-200/80 shadow-2xs z-10 flex items-center gap-0.5">
+          <span className="text-[8px]">↳</span> {isFolder ? "L1" : "L2"}
+        </span>
+
+        {/* Top-Right Arrow Action Icon */}
+        <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-white/90 text-slate-500 flex items-center justify-center shadow-2xs group-hover:scale-110 transition-transform">
+          <ChevronRight className="h-3 w-3" />
+        </div>
+
+        {/* Center Media / Folder Icon Preview */}
+        {isFolder ? (
+          <div className="h-16 w-20 flex items-center justify-center transform group-hover:scale-105 transition-transform">
+            <svg viewBox="0 0 24 24" fill="none" className="h-full w-full">
+              <path
+                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                fill="#F59E0B"
+                stroke="#D97706"
+                strokeWidth="1.2"
+              />
+            </svg>
+          </div>
+        ) : node.kind === "image" && node.contentUrl ? (
+          <img
+            src={node.contentUrl}
+            alt={node.name}
+            className="h-full w-full object-cover rounded-md group-hover:scale-105 transition-transform"
+          />
+        ) : node.kind === "video" ? (
+          <div className="h-16 w-16 flex items-center justify-center transform group-hover:scale-105 transition-transform">
+            <svg viewBox="0 0 24 24" fill="none" className="h-full w-full text-rose-500">
+              <rect x="3" y="4" width="18" height="16" rx="3" fill="#EF4444" />
+              <path d="M7 4V8M12 4V8M17 4V8" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </div>
+        ) : node.kind === "pdf" ? (
+          <div className="h-14 w-14 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center transform group-hover:scale-105 transition-transform">
+            <FileText className="h-8 w-8 stroke-[1.8]" />
+          </div>
+        ) : (
+          <div className="h-14 w-14 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center transform group-hover:scale-105 transition-transform">
+            <FileText className="h-8 w-8 stroke-[1.8]" />
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Details Section */}
+      <div className="p-2 flex-1 flex flex-col justify-between bg-white dark:bg-card">
+        <div className="text-center min-w-0">
+          <h6 className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate px-1" title={node.name}>
+            {node.name}
+          </h6>
+          <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
+            {isFolder ? `${node.children?.length || 0} items` : node.size || "816.61 KB"}
+          </p>
+        </div>
+
+        <div className="flex items-center justify-center gap-1.5 pt-0.5 border-t border-slate-100 dark:border-border/30">
+          <div className="h-3.5 w-3.5 rounded-full bg-blue-700 text-white font-bold text-[8px] flex items-center justify-center shrink-0">
+            A
+          </div>
+          <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate max-w-[100px]">
+            {node.owner}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
