@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { type HmsArticle, getArticleHierarchy } from "@/components/hms/hmsStore";
 import { SCREEN_IMAGES, COMPONENT_HOTSPOTS, defaultHotspot } from "@/lib/screen-assets";
 import { Badge } from "@/components/ui/badge";
@@ -41,8 +41,16 @@ export function SnapshotViewer({
   onClose,
   canApprove = true,
 }: SnapshotViewerProps) {
-  const [activeTab, setActiveTab] = useState<"snapshot" | "content">("snapshot");
+  const [activeTab, setActiveTab] = useState<"snapshot" | "content">("content");
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
+
+  useEffect(() => {
+    if (article?.contentUrl) {
+      setActiveTab("content");
+    } else {
+      setActiveTab("snapshot");
+    }
+  }, [article?.id, article?.contentUrl]);
 
   if (!article) {
     return (
@@ -254,74 +262,93 @@ export function SnapshotViewer({
           <div className="space-y-3">
             {article.contentType === "video" && (
               <div className="rounded-xl border overflow-hidden bg-slate-950 text-white">
-                <div className="relative aspect-video flex items-center justify-center bg-black/60">
-                  {!isPlayingVideo ? (
-                    <div className="text-center space-y-3 p-4">
-                      <button
-                        type="button"
-                        onClick={() => setIsPlayingVideo(true)}
-                        className="size-12 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center mx-auto transition-transform hover:scale-105 shadow-lg"
-                      >
-                        <Play className="size-6 fill-current translate-x-0.5" />
-                      </button>
-                      <div>
-                        <div className="font-medium text-sm text-white">{article.title}</div>
-                        <div className="text-xs text-white/70 mt-0.5">Click to play video demonstration</div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="w-full h-full p-4 flex flex-col justify-between bg-slate-900">
-                      <div className="flex items-center justify-between text-xs text-white/80">
-                        <span>Previewing Video Recording</span>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 text-white/80 hover:text-white"
-                          onClick={() => setIsPlayingVideo(false)}
+                {article.contentUrl ? (
+                  <video
+                    src={article.contentUrl}
+                    controls
+                    autoPlay
+                    className="w-full max-h-[380px] object-contain"
+                  />
+                ) : (
+                  <div className="relative aspect-video flex items-center justify-center bg-black/60">
+                    {!isPlayingVideo ? (
+                      <div className="text-center space-y-3 p-4">
+                        <button
+                          type="button"
+                          onClick={() => setIsPlayingVideo(true)}
+                          className="size-12 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center mx-auto transition-transform hover:scale-105 shadow-lg"
                         >
-                          <RotateCcw className="size-3 mr-1" /> Replay
-                        </Button>
+                          <Play className="size-6 fill-current translate-x-0.5" />
+                        </button>
+                        <div>
+                          <div className="font-medium text-sm text-white">{article.title}</div>
+                          <div className="text-xs text-white/70 mt-0.5">Click to play video demonstration</div>
+                        </div>
                       </div>
-                      <div className="text-center py-8">
-                        <Video className="size-10 text-purple-400 mx-auto mb-2 animate-bounce" />
-                        <p className="text-xs text-white/70">Video media stream active</p>
+                    ) : (
+                      <div className="w-full h-full p-4 flex flex-col justify-between bg-slate-900">
+                        <div className="flex items-center justify-between text-xs text-white/80">
+                          <span>Previewing Video Recording</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 text-white/80 hover:text-white"
+                            onClick={() => setIsPlayingVideo(false)}
+                          >
+                            <RotateCcw className="size-3 mr-1" /> Replay
+                          </Button>
+                        </div>
+                        <div className="text-center py-8">
+                          <Video className="size-10 text-purple-400 mx-auto mb-2 animate-bounce" />
+                          <p className="text-xs text-white/70">Video media stream active</p>
+                        </div>
+                        <div className="h-1 bg-white/20 rounded-full overflow-hidden">
+                          <div className="h-full bg-purple-500 w-3/4 animate-pulse" />
+                        </div>
                       </div>
-                      <div className="h-1 bg-white/20 rounded-full overflow-hidden">
-                        <div className="h-full bg-purple-500 w-3/4 animate-pulse" />
-                      </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
             {article.contentType === "pdf" && (
-              <div className="rounded-xl border p-4 bg-muted/20 space-y-3">
-                <div className="flex items-center justify-between border-b pb-3">
-                  <div className="flex items-center gap-2">
-                    <FileText className="size-5 text-rose-500" />
-                    <div>
-                      <div className="font-semibold text-xs text-foreground">{article.title}</div>
-                      <div className="text-[11px] text-muted-foreground">{article.pages ?? 3} Pages • PDF Document</div>
+              <div className="rounded-xl border overflow-hidden bg-white">
+                {article.contentUrl ? (
+                  <iframe
+                    src={article.contentUrl}
+                    title={article.title}
+                    className="w-full h-[380px] rounded-lg border-0"
+                  />
+                ) : (
+                  <div className="p-4 bg-muted/20 space-y-3">
+                    <div className="flex items-center justify-between border-b pb-3">
+                      <div className="flex items-center gap-2">
+                        <FileText className="size-5 text-rose-500" />
+                        <div>
+                          <div className="font-semibold text-xs text-foreground">{article.title}</div>
+                          <div className="text-[11px] text-muted-foreground">{article.pages ?? 3} Pages • PDF Document</div>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px]">PDF Document</Badge>
+                    </div>
+                    <div className="p-3 bg-card border rounded-lg text-xs space-y-2">
+                      <div className="font-medium text-foreground text-[11px] uppercase tracking-wider text-muted-foreground">Excerpt Preview</div>
+                      <p className="text-muted-foreground leading-relaxed">
+                        This PDF documentation provides step-by-step instructions for managing and configuring the {hierarchy.controlName} within the {hierarchy.pageName} module.
+                      </p>
                     </div>
                   </div>
-                  <Badge variant="outline" className="text-[10px]">PDF Document</Badge>
-                </div>
-                <div className="p-3 bg-card border rounded-lg text-xs space-y-2">
-                  <div className="font-medium text-foreground text-[11px] uppercase tracking-wider text-muted-foreground">Excerpt Preview</div>
-                  <p className="text-muted-foreground leading-relaxed">
-                    This PDF documentation provides step-by-step instructions for managing and configuring the {hierarchy.controlName} within the {hierarchy.pageName} module.
-                  </p>
-                </div>
+                )}
               </div>
             )}
 
             {article.contentType === "image" && (
-              <div className="rounded-xl border overflow-hidden bg-muted/40 p-2">
+              <div className="rounded-xl border overflow-hidden bg-slate-950 p-2 flex items-center justify-center min-h-[260px]">
                 <img
-                  src={screenImage}
+                  src={article.contentUrl || screenImage}
                   alt={article.title}
-                  className="w-full h-auto rounded-lg object-cover max-h-[300px]"
+                  className="w-full h-auto rounded-lg object-contain max-h-[380px]"
                 />
               </div>
             )}

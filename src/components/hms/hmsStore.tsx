@@ -234,10 +234,8 @@ const SEED_ARTICLES: HmsArticle[] = [
     contentType: "video",
     contentUrl: null,
     contexts: ["site-recordings-date-filter"],
-    approvalStatus: "pending",
-    archiveStatus: "active",
-    approvedBy: null,
-    approvedAt: null,
+    ...APPROVED,
+    approvedAt: "2026-07-20T09:00:00Z",
     createdAt: "2026-07-20T09:00:00Z",
     updatedAt: "2026-07-20T09:00:00Z",
     authorName: "Priya Natarajan",
@@ -615,7 +613,7 @@ const DEFAULT_STATE: HmsState = {
   notifications: { customer: 0, helpAdmin: 0, admin: 0 },
 };
 
-const STORAGE_KEY = "hmsStore.v2";
+const STORAGE_KEY = "hmsStore.v4";
 
 function loadPersistedState(): HmsState {
   if (typeof window === "undefined") return DEFAULT_STATE;

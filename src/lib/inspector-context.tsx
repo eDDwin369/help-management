@@ -130,12 +130,12 @@ export function HelpInspectorProvider({ children }: { children: ReactNode }) {
     const handleScroll = () => scanPage();
 
     window.addEventListener("resize", handleResize, { passive: true });
-    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("scroll", handleScroll, { capture: true, passive: true });
 
     return () => {
       clearTimeout(timer);
       window.removeEventListener("resize", handleResize);
-      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("scroll", handleScroll, { capture: true } as any);
     };
   }, [isAdmin, pathname, scanPage]);
 

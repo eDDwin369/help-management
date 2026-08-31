@@ -1,23 +1,51 @@
+import { useState, useEffect } from "react";
 import { useHelpInspector } from "@/lib/inspector-context";
 import { Target } from "lucide-react";
 
 export function HoverFocusHighlight() {
   const { highlightedContextKey, locations } = useHelpInspector();
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    let rAfId: number | null = null;
+    const update = () => setTick((t) => t + 1);
+
+    const handleScrollOrResize = () => {
+      if (rAfId !== null) cancelAnimationFrame(rAfId);
+      rAfId = requestAnimationFrame(update);
+    };
+
+    window.addEventListener("scroll", handleScrollOrResize, { capture: true, passive: true });
+    window.addEventListener("resize", handleScrollOrResize, { passive: true });
+
+    return () => {
+      if (rAfId !== null) cancelAnimationFrame(rAfId);
+      window.removeEventListener("scroll", handleScrollOrResize, { capture: true } as any);
+      window.removeEventListener("resize", handleScrollOrResize);
+    };
+  }, []);
 
   if (!highlightedContextKey) return null;
 
   const target = locations.find((l) => l.contextKey === highlightedContextKey);
 
-  let rect: DOMRect | null = null;
-  if (target?.element) {
-    rect = target.element.getBoundingClientRect();
-  }
+  if (!target?.element || !target.element.isConnected) return null;
 
-  if (!rect || !target || (rect.width === 0 && rect.height === 0)) return null;
+  const rect = target.element.getBoundingClientRect();
+
+  const isVisible =
+    rect.width > 0 &&
+    rect.height > 0 &&
+    rect.bottom > 50 &&
+    rect.top < (typeof window !== "undefined" ? window.innerHeight - 36 : 1000) &&
+    rect.right > 0 &&
+    rect.left < (typeof window !== "undefined" ? window.innerWidth : 1000);
+
+  if (!isVisible) return null;
 
   // Smart positioning to prevent viewport cropping
-  const isNearTop = rect.top < 55;
-  const isNearRight = rect.left + 280 > window.innerWidth;
+  const isNearTop = rect.top < 65;
+  const isNearRight = rect.left + 280 > (typeof window !== "undefined" ? window.innerWidth : 1000);
 
   return (
     <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden">

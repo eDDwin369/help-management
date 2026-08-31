@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { helpStore, REGISTERED_COMPONENTS } from "@/lib/mock-data";
 import { useAuth } from "@/lib/auth-context";
+import { useHmsStore } from "@/components/hms/hmsStore";
 import { toast } from "sonner";
 import type { HelpContentType, HelpItem } from "@/lib/types";
 import { compressImageFile } from "@/lib/utils";
@@ -47,6 +48,7 @@ export function AddHelpItemDialog({
   defaultSectionType?: HelpSectionType;
 }) {
   const { user } = useAuth();
+  const { addArticle } = useHmsStore();
   const fallback = REGISTERED_COMPONENTS[0];
   const componentKey = defaultComponent?.key ?? fallback.key;
   const componentLabel = defaultComponent?.label ?? fallback.label;
@@ -138,6 +140,32 @@ export function AddHelpItemDialog({
         sizeKb: Math.round(file.size / 1024),
       };
       helpStore.add(item);
+      addArticle({
+        id: `art-${item.id}`,
+        title: item.title,
+        description: item.description || `Help content added for ${componentLabel}`,
+        contentType: item.contentType,
+        contentUrl: item.url || null,
+        relatedContext: componentLabel,
+        contexts: [componentKey],
+        hierarchy: {
+          pageName: componentLabel.includes("Recordings") || componentKey.includes("site-recordings")
+            ? "Site Recordings"
+            : componentLabel.split(" › ")[0].replace(" Table", "").trim() || "Site Recordings",
+          cardName: componentLabel,
+          controlName: item.title,
+        },
+        approvalStatus: user?.role === "admin" ? "approved" : "pending",
+        archiveStatus: "active",
+        authorId: user?.id || "sub_admin",
+        authorName: user?.name || "Help Admin",
+        approvedBy: user?.role === "admin" ? user?.name || "Jordan Admin" : null,
+        approvedAt: user?.role === "admin" ? new Date().toISOString() : null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        tags: item.tags,
+        priority: "medium",
+      });
       toast.success("Help added");
       setSubmitting(false);
       reset();

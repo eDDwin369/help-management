@@ -75,7 +75,7 @@ const SAMPLE_MEDIA: Record<string, string> = {
   text: "This document contains step-by-step instructions for managing drawings and site plans in HMS.",
 };
 
-const LOCAL_STORAGE_NODES_KEY = "hms_help_admin_nodes";
+const LOCAL_STORAGE_NODES_KEY = "hms_help_admin_nodes_v2";
 
 function deduplicateNodes(list: HelpAdminNode[]): HelpAdminNode[] {
   const seenIds = new Set<string>();
@@ -177,9 +177,52 @@ function loadSavedNodes(): HelpAdminNode[] {
   }
 }
 
+function getArticleContextAndHierarchy(
+  node: HelpAdminNode,
+  context: string,
+  contextKey: string,
+  nodesList: HelpAdminNode[]
+) {
+  let parentFolderName = "";
+  if (node.parentId) {
+    const findParent = (list: HelpAdminNode[]): string | null => {
+      for (const item of list) {
+        if (item.id === node.parentId) return item.name;
+        if (item.children) {
+          const res = findParent(item.children);
+          if (res) return res;
+        }
+      }
+      return null;
+    };
+    parentFolderName = findParent(nodesList) || "";
+  }
+
+  let pageName = "Site Recordings";
+  if (context && context !== "Workspace") {
+    pageName = context.split(" › ")[0].trim() || "Site Recordings";
+  }
+
+  const cardName = parentFolderName || "Drawings";
+  const controlName = node.name;
+
+  return {
+    pageName,
+    cardName,
+    controlName,
+    relatedContext: `${pageName} › ${cardName} › ${controlName}`,
+    contextKey: contextKey && contextKey !== "workspace" ? contextKey : "site-recordings-table",
+    hierarchy: {
+      pageName,
+      cardName,
+      controlName,
+    },
+  };
+}
+
 export function HelpAdminRightClickModal() {
   const { user } = useAuth();
-  const { context, contextKey, addArticle, openPanel } = useHmsStore();
+  const { state: hmsState, context, contextKey, addArticle, openPanel } = useHmsStore();
 
   const isHelpAdmin = user?.role === "sub_admin" || user?.role === "admin";
 
@@ -188,6 +231,7 @@ export function HelpAdminRightClickModal() {
   const [search, setSearch] = useState("");
 
   const [nodes, setNodes] = useState<HelpAdminNode[]>(() => loadSavedNodes());
+
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
@@ -305,12 +349,15 @@ export function HelpAdminRightClickModal() {
   };
   const togglePanMode = () => setIsPanActive((prev) => !prev);
 
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+
   // Native HTML5 Fullscreen API Toggle (Hides browser tabs, URL bar & OS taskbar)
   const toggleFullscreen = async () => {
     try {
       if (!document.fullscreenElement) {
-        if (document.documentElement.requestFullscreen) {
-          await document.documentElement.requestFullscreen();
+        const targetEl = previewContainerRef.current || document.documentElement;
+        if (targetEl.requestFullscreen) {
+          await targetEl.requestFullscreen();
         }
         setIsFullscreen(true);
       } else {
@@ -768,12 +815,38 @@ export function HelpAdminRightClickModal() {
       name: baseName,
       kind,
       parentId: targetParentId,
-      owner: user?.name || "Help Admin",
+      owner: user?.name || (user?.role === "admin" ? "Superadmin" : "Help Admin"),
       modified: "Just now",
       size: formatFileSize(file.size),
       contentUrl: contentUrl || SAMPLE_MEDIA[kind] || SAMPLE_MEDIA.image,
-      approvalStatus: "draft",
+      approvalStatus: user?.role === "admin" ? "approved" : "pending",
     };
+
+    const mappedType: ContentType =
+      kind === "pdf" ? "pdf" : kind === "video" ? "video" : kind === "image" ? "image" : "text";
+
+    const meta = getArticleContextAndHierarchy(newNode, context, contextKey, nodes);
+
+    addArticle({
+      id: `art-${newNode.id}`,
+      title: newNode.name,
+      description: `Help resource uploaded by ${newNode.owner} for ${meta.pageName}`,
+      contentType: mappedType,
+      contentUrl: newNode.contentUrl || null,
+      relatedContext: meta.relatedContext,
+      contexts: [meta.contextKey],
+      hierarchy: meta.hierarchy,
+      approvalStatus: user?.role === "admin" ? "approved" : "pending",
+      archiveStatus: "active",
+      authorId: user?.id || (user?.role === "admin" ? "admin" : "sub_admin"),
+      authorName: newNode.owner,
+      approvedBy: user?.role === "admin" ? user?.name || "Jordan Admin" : null,
+      approvedAt: user?.role === "admin" ? new Date().toISOString() : null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      tags: ["help-admin", kind],
+      priority: "medium",
+    });
 
     if (!targetParentId) {
       setNodes((prev) => [newNode, ...prev]);
@@ -800,7 +873,7 @@ export function HelpAdminRightClickModal() {
       }
     }
 
-    toast.success(`Uploaded file "${file.name}"`);
+    toast.success(`Uploaded file "${file.name}" — added to Approvals`);
   };
 
   // Create new folder node
@@ -898,14 +971,17 @@ export function HelpAdminRightClickModal() {
     const mappedType: ContentType =
       node.kind === "pdf" ? "pdf" : node.kind === "video" ? "video" : node.kind === "image" ? "image" : "text";
 
+    const meta = getArticleContextAndHierarchy(node, context, contextKey, nodes);
+
     addArticle({
       id: `art-${node.id}`,
       title: node.name,
-      description: node.description || `Help resource submitted by ${node.owner} for context ${context || "My Drawings"}`,
+      description: node.description || `Help resource submitted by ${node.owner} for context ${meta.pageName}`,
       contentType: mappedType,
       contentUrl: node.contentUrl || null,
-      relatedContext: context || "My Drawings",
-      contexts: [contextKey || "my-drawings-table"],
+      relatedContext: meta.relatedContext,
+      contexts: [meta.contextKey],
+      hierarchy: meta.hierarchy,
       approvalStatus: "pending",
       archiveStatus: "active",
       authorId: user?.id || "sub_admin",
@@ -1512,15 +1588,36 @@ export function HelpAdminRightClickModal() {
           }}
         >
           <DialogContent
+            ref={previewContainerRef}
+            style={
+              isFullscreen
+                ? {
+                    position: "fixed",
+                    left: 0,
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                    width: "100vw",
+                    height: "100vh",
+                    maxWidth: "100vw",
+                    maxHeight: "100vh",
+                    transform: "none",
+                    borderRadius: 0,
+                    margin: 0,
+                    padding: "16px",
+                    zIndex: 999999,
+                  }
+                : undefined
+            }
             className={
               isFullscreen
-                ? "fixed inset-0 w-screen h-screen max-w-none max-h-none rounded-none z-[10000] p-6 bg-slate-950 text-white flex flex-col justify-between border-0 transition-all"
-                : "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-2xl transition-all z-[10000] p-5 bg-card text-card-foreground border border-border/80 shadow-2xl w-[90vw] max-w-xl"
+                ? "!fixed !inset-0 !left-0 !top-0 !right-0 !bottom-0 !w-screen !h-screen !max-w-none !max-h-none !translate-x-0 !translate-y-0 !m-0 !rounded-none !p-4 !bg-slate-950 text-white flex flex-col justify-between !border-0 z-[999999]"
+                : "rounded-2xl transition-all z-[10000] p-5 bg-card text-card-foreground border border-border/80 shadow-2xl w-[90vw] max-w-xl"
             }
           >
             {/* Sleek Dark Floating Navigation Pill Bar */}
             <div
-              className={`absolute left-1/2 -translate-x-1/2 z-[70] flex items-center gap-2.5 px-4 py-2 rounded-full bg-[#18181B] dark:bg-slate-950/95 backdrop-blur-xl border border-white/20 shadow-2xl text-white text-xs select-none animate-in fade-in slide-in-from-bottom-3 duration-200 ${
+              className={`absolute left-1/2 -translate-x-1/2 z-[100000] flex items-center gap-2.5 px-4 py-2 rounded-full bg-[#18181B] dark:bg-slate-950/95 backdrop-blur-xl border border-white/20 shadow-2xl text-white text-xs select-none animate-in fade-in slide-in-from-bottom-3 duration-200 ${
                 isFullscreen ? "top-4" : "-top-14"
               }`}
             >
@@ -1660,10 +1757,10 @@ export function HelpAdminRightClickModal() {
             </DialogHeader>
 
             {/* Interactive Viewport Area with Zoom & Pan handlers */}
-            <div className="py-2 flex-1 min-h-0 overflow-hidden">
+            <div className="py-2 flex-1 min-h-0 overflow-hidden flex flex-col justify-center items-center">
               <div
-                className={`relative rounded-xl overflow-hidden border border-border bg-slate-900/5 flex items-center justify-center transition-all ${
-                  isFullscreen ? "h-full min-h-[420px]" : "h-[340px]"
+                className={`relative rounded-xl overflow-hidden border border-border flex items-center justify-center transition-all w-full ${
+                  isFullscreen ? "h-full flex-1 bg-black/90" : "h-[340px] bg-slate-900/5"
                 } ${isPanActive ? "cursor-grab active:cursor-grabbing select-none" : ""}`}
                 onMouseDown={(e) => {
                   if (!isPanActive) return;
@@ -1691,7 +1788,7 @@ export function HelpAdminRightClickModal() {
                     <img
                       src={previewNode.contentUrl || SAMPLE_MEDIA.image}
                       alt={previewNode.name}
-                      className="max-h-full max-w-full object-contain pointer-events-none"
+                      className="max-h-full max-w-full w-full h-full object-contain pointer-events-none"
                       onError={(e) => {
                         const target = e.currentTarget;
                         if (target.src !== SAMPLE_MEDIA.image) {
@@ -1706,7 +1803,7 @@ export function HelpAdminRightClickModal() {
                       src={previewNode.contentUrl || SAMPLE_MEDIA.video}
                       controls
                       autoPlay
-                      className="max-h-full max-w-full object-contain"
+                      className="max-h-full max-w-full w-full h-full object-contain"
                     />
                   )}
 

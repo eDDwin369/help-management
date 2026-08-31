@@ -10,6 +10,29 @@ export function VisualHelpHighlighter() {
   const { setContext, openPanel, requestPanelView } = useHmsStore();
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const [, setTick] = useState(0);
+
+  // Subscribe to scroll & resize events (with capture) to update bounding rects smoothly in real-time
+  useEffect(() => {
+    let rAfId: number | null = null;
+    const update = () => {
+      setTick((t) => t + 1);
+    };
+
+    const handleScrollOrResize = () => {
+      if (rAfId !== null) cancelAnimationFrame(rAfId);
+      rAfId = requestAnimationFrame(update);
+    };
+
+    window.addEventListener("scroll", handleScrollOrResize, { capture: true, passive: true });
+    window.addEventListener("resize", handleScrollOrResize, { passive: true });
+
+    return () => {
+      if (rAfId !== null) cancelAnimationFrame(rAfId);
+      window.removeEventListener("scroll", handleScrollOrResize, { capture: true } as any);
+      window.removeEventListener("resize", handleScrollOrResize);
+    };
+  }, []);
 
   // Close active popover when clicking outside
   useEffect(() => {
@@ -33,12 +56,31 @@ export function VisualHelpHighlighter() {
   return (
     <div className="pointer-events-none fixed inset-0 z-40">
       {locationsWithHelp.map((loc) => {
-        const { contextKey, label, rect, articles } = loc;
+        const { contextKey, label, element, articles } = loc;
+        if (!element || !element.isConnected) return null;
+
+        // Dynamically compute exact bounding rect on current frame
+        const rect = element.getBoundingClientRect();
+
+        // Viewport visibility checks - hide highlight if target scrolled off screen or under header/footer
+        const isVisible =
+          rect.width > 0 &&
+          rect.height > 0 &&
+          rect.bottom > 50 &&
+          rect.top < (typeof window !== "undefined" ? window.innerHeight - 36 : 1000) &&
+          rect.right > 0 &&
+          rect.left < (typeof window !== "undefined" ? window.innerWidth : 1000);
+
+        if (!isVisible) {
+          if (activeKey === contextKey) setActiveKey(null);
+          return null;
+        }
+
         const isActive = activeKey === contextKey;
         const isHovered = hoveredKey === contextKey;
 
         // Viewport boundary checks
-        const isNearTop = rect.top < 50;
+        const isNearTop = rect.top < 70;
         const popoverShowBelow = rect.top < 220;
         const isNearRight = typeof window !== "undefined" && rect.right > window.innerWidth - 340;
         const isNearLeft = rect.left < 160;
@@ -62,7 +104,7 @@ export function VisualHelpHighlighter() {
               // Stacking context elevation: Active location is elevated far above all other badges
               zIndex: isActive ? 9999 : isHovered ? 30 : 20,
             }}
-            className="pointer-events-auto group transition-all duration-150"
+            className="pointer-events-auto group transition-all duration-75"
             onMouseEnter={() => setHoveredKey(contextKey)}
             onMouseLeave={() => setHoveredKey(null)}
           >
