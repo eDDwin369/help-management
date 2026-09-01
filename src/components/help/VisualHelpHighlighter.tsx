@@ -12,27 +12,93 @@ export function VisualHelpHighlighter() {
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [, setTick] = useState(0);
 
-  // Subscribe to scroll & resize events (with capture) to update bounding rects smoothly in real-time
+  // Direct DOM style mutation on rAF to bypass React render cycle latency & track 60fps synchronously
   useEffect(() => {
     let rAfId: number | null = null;
-    const update = () => {
-      setTick((t) => t + 1);
+    let running = true;
+
+    const updateDirectDOM = () => {
+      locations.forEach((loc) => {
+        if (!loc.element || !loc.element.isConnected) return;
+        const overlayEl = document.querySelector<HTMLElement>(`[data-help-popover="${loc.contextKey}"]`);
+        if (!overlayEl) return;
+
+        const rect = loc.element.getBoundingClientRect();
+        const isVisible =
+          rect.width > 0 &&
+          rect.height > 0 &&
+          rect.bottom > 50 &&
+          rect.top < (typeof window !== "undefined" ? window.innerHeight - 36 : 1000) &&
+          rect.right > 0 &&
+          rect.left < (typeof window !== "undefined" ? window.innerWidth : 1000);
+
+        if (!isVisible) {
+          overlayEl.style.display = "none";
+        } else {
+          overlayEl.style.display = "block";
+          overlayEl.style.top = `${rect.top}px`;
+          overlayEl.style.left = `${rect.left}px`;
+          overlayEl.style.width = `${rect.width}px`;
+          overlayEl.style.height = `${rect.height}px`;
+        }
+      });
     };
 
-    const handleScrollOrResize = () => {
+    const loop = () => {
+      if (!running) return;
+      updateDirectDOM();
+      rAfId = requestAnimationFrame(loop);
+    };
+
+    const triggerUpdate = () => {
       if (rAfId !== null) cancelAnimationFrame(rAfId);
-      rAfId = requestAnimationFrame(update);
+      rAfId = requestAnimationFrame(loop);
     };
 
-    window.addEventListener("scroll", handleScrollOrResize, { capture: true, passive: true });
-    window.addEventListener("resize", handleScrollOrResize, { passive: true });
+    // 1. Scroll, resize, and animation/transition event listeners
+    window.addEventListener("scroll", triggerUpdate, { capture: true, passive: true });
+    window.addEventListener("resize", triggerUpdate, { passive: true });
+    window.addEventListener("transitionend", triggerUpdate, { capture: true, passive: true });
+    window.addEventListener("animationend", triggerUpdate, { capture: true, passive: true });
+
+    // 2. ResizeObserver to catch sidebar expand/collapse & layout changes on body/main
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined" && document.body) {
+      resizeObserver = new ResizeObserver(() => {
+        triggerUpdate();
+      });
+      resizeObserver.observe(document.body);
+      const mainEl = document.querySelector("main");
+      if (mainEl) resizeObserver.observe(mainEl);
+    }
+
+    // 3. MutationObserver to catch sidebar class/attribute toggles
+    let mutationObserver: MutationObserver | null = null;
+    if (typeof MutationObserver !== "undefined" && document.body) {
+      mutationObserver = new MutationObserver(() => {
+        triggerUpdate();
+      });
+      mutationObserver.observe(document.body, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+        attributeFilter: ["class", "style", "data-state", "data-collapsed"],
+      });
+    }
+
+    rAfId = requestAnimationFrame(loop);
 
     return () => {
+      running = false;
       if (rAfId !== null) cancelAnimationFrame(rAfId);
-      window.removeEventListener("scroll", handleScrollOrResize, { capture: true } as any);
-      window.removeEventListener("resize", handleScrollOrResize);
+      window.removeEventListener("scroll", triggerUpdate, { capture: true } as any);
+      window.removeEventListener("resize", triggerUpdate);
+      window.removeEventListener("transitionend", triggerUpdate, { capture: true } as any);
+      window.removeEventListener("animationend", triggerUpdate, { capture: true } as any);
+      if (resizeObserver) resizeObserver.disconnect();
+      if (mutationObserver) mutationObserver.disconnect();
     };
-  }, []);
+  }, [locations]);
 
   // Close active popover when clicking outside
   useEffect(() => {
@@ -104,7 +170,7 @@ export function VisualHelpHighlighter() {
               // Stacking context elevation: Active location is elevated far above all other badges
               zIndex: isActive ? 9999 : isHovered ? 30 : 20,
             }}
-            className="pointer-events-auto group transition-all duration-75"
+            className="pointer-events-auto group transition-none"
             onMouseEnter={() => setHoveredKey(contextKey)}
             onMouseLeave={() => setHoveredKey(null)}
           >

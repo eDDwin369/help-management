@@ -8,22 +8,91 @@ export function HoverFocusHighlight() {
 
   useEffect(() => {
     let rAfId: number | null = null;
-    const update = () => setTick((t) => t + 1);
+    let running = true;
 
-    const handleScrollOrResize = () => {
-      if (rAfId !== null) cancelAnimationFrame(rAfId);
-      rAfId = requestAnimationFrame(update);
+    const updateDirectDOM = () => {
+      if (!highlightedContextKey) return;
+      const target = locations.find((l) => l.contextKey === highlightedContextKey);
+      if (!target?.element || !target.element.isConnected) return;
+
+      const overlayEl = document.querySelector<HTMLElement>(`[data-hover-focus-overlay="true"]`);
+      if (!overlayEl) return;
+
+      const rect = target.element.getBoundingClientRect();
+      const isVisible =
+        rect.width > 0 &&
+        rect.height > 0 &&
+        rect.bottom > 50 &&
+        rect.top < (typeof window !== "undefined" ? window.innerHeight - 36 : 1000) &&
+        rect.right > 0 &&
+        rect.left < (typeof window !== "undefined" ? window.innerWidth : 1000);
+
+      if (!isVisible) {
+        overlayEl.style.display = "none";
+      } else {
+        overlayEl.style.display = "block";
+        overlayEl.style.top = `${rect.top}px`;
+        overlayEl.style.left = `${rect.left}px`;
+        overlayEl.style.width = `${rect.width}px`;
+        overlayEl.style.height = `${rect.height}px`;
+      }
     };
 
-    window.addEventListener("scroll", handleScrollOrResize, { capture: true, passive: true });
-    window.addEventListener("resize", handleScrollOrResize, { passive: true });
+    const loop = () => {
+      if (!running) return;
+      updateDirectDOM();
+      rAfId = requestAnimationFrame(loop);
+    };
+
+    const triggerUpdate = () => {
+      if (rAfId !== null) cancelAnimationFrame(rAfId);
+      rAfId = requestAnimationFrame(loop);
+    };
+
+    // 1. Event listeners for scroll, resize, transition, animation
+    window.addEventListener("scroll", triggerUpdate, { capture: true, passive: true });
+    window.addEventListener("resize", triggerUpdate, { passive: true });
+    window.addEventListener("transitionend", triggerUpdate, { capture: true, passive: true });
+    window.addEventListener("animationend", triggerUpdate, { capture: true, passive: true });
+
+    // 2. ResizeObserver on document.body & main to catch sidebar expand/collapse
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined" && document.body) {
+      resizeObserver = new ResizeObserver(() => {
+        triggerUpdate();
+      });
+      resizeObserver.observe(document.body);
+      const mainEl = document.querySelector("main");
+      if (mainEl) resizeObserver.observe(mainEl);
+    }
+
+    // 3. MutationObserver to catch sidebar attribute/class changes
+    let mutationObserver: MutationObserver | null = null;
+    if (typeof MutationObserver !== "undefined" && document.body) {
+      mutationObserver = new MutationObserver(() => {
+        triggerUpdate();
+      });
+      mutationObserver.observe(document.body, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+        attributeFilter: ["class", "style", "data-state", "data-collapsed"],
+      });
+    }
+
+    rAfId = requestAnimationFrame(loop);
 
     return () => {
+      running = false;
       if (rAfId !== null) cancelAnimationFrame(rAfId);
-      window.removeEventListener("scroll", handleScrollOrResize, { capture: true } as any);
-      window.removeEventListener("resize", handleScrollOrResize);
+      window.removeEventListener("scroll", triggerUpdate, { capture: true } as any);
+      window.removeEventListener("resize", triggerUpdate);
+      window.removeEventListener("transitionend", triggerUpdate, { capture: true } as any);
+      window.removeEventListener("animationend", triggerUpdate, { capture: true } as any);
+      if (resizeObserver) resizeObserver.disconnect();
+      if (mutationObserver) mutationObserver.disconnect();
     };
-  }, []);
+  }, [highlightedContextKey, locations]);
 
   if (!highlightedContextKey) return null;
 
@@ -51,6 +120,7 @@ export function HoverFocusHighlight() {
     <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden">
       {/* Target Element Highlight Box */}
       <div
+        data-hover-focus-overlay="true"
         style={{
           position: "fixed",
           top: `${rect.top}px`,
@@ -58,7 +128,7 @@ export function HoverFocusHighlight() {
           width: `${rect.width}px`,
           height: `${rect.height}px`,
         }}
-        className="z-50 transition-all duration-150 ease-out"
+        className="z-50 transition-none"
       >
         {/* Pulsing Highlight Box */}
         <div className="absolute -inset-1 rounded-xl border-2 border-indigo-500 bg-indigo-500/20 shadow-[0_0_30px_rgba(99,102,241,0.7)] animate-pulse" />
