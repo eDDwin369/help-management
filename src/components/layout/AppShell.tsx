@@ -48,7 +48,7 @@ function roleLabel(role: string) {
   return role;
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, darkTheme = false }: { children: ReactNode; darkTheme?: boolean }) {
   useStoreVersion();
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
@@ -102,7 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <TooltipProvider delayDuration={150}>
-      <div className="h-screen w-screen overflow-hidden flex flex-col bg-background">
+      <div className={`h-screen w-screen overflow-hidden flex flex-col ${darkTheme ? 'bg-[#050814] text-white' : 'bg-background'}`}>
         {/* Full-width Header from twin_eye */}
         <TwinHeader
           headerConfig={headerConfig}
@@ -147,11 +147,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             showLabels={sidebarShowLabels}
             forceCollapsed={forceSidebarCollapsed}
           />
-          <main className="flex-1 overflow-auto bg-background">{children}</main>
+          <main className={`flex-1 overflow-auto ${darkTheme ? 'bg-[#050814] text-white' : 'bg-background'}`}>{children}</main>
         </div>
 
         {/* Full-width Footer on Bottom */}
-        <footer className={`h-9 border-t bg-card flex items-center justify-between px-6 text-xs text-muted-foreground shrink-0 z-30 ${globalSettingsOpen && activeSettingsTab === 'footer' ? 'editing-focus' : ''}`}>
+        <footer className={`h-9 border-t flex items-center justify-between px-6 text-xs shrink-0 z-30 ${darkTheme ? 'bg-[#070b19] border-slate-800 text-slate-400' : 'bg-card border-border text-muted-foreground'} ${globalSettingsOpen && activeSettingsTab === 'footer' ? 'editing-focus' : ''}`}>
           <span>Ready</span>
           <span>© 2026 OomniEye. All rights reserved.</span>
           <span className="font-semibold tracking-wider text-emerald-600">ALLCAD</span>

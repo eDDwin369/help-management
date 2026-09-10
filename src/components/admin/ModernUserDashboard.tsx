@@ -122,25 +122,27 @@ export function ModernUserDashboard() {
   ];
 
   const getStatusBadge = (status: ApprovalQueueItem["status"]) => {
+    const baseClasses =
+      "inline-flex items-center justify-center gap-1.5 w-24 py-1 rounded-full text-xs font-semibold shrink-0 text-center";
     switch (status) {
       case "In Review":
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-100/80 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+          <span className={`${baseClasses} bg-purple-100/80 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-500 shrink-0" />
             In Review
           </span>
         );
       case "Pending":
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-100/80 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+          <span className={`${baseClasses} bg-amber-100/80 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
             Pending
           </span>
         );
       case "Active":
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100/80 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          <span className={`${baseClasses} bg-emerald-100/80 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
             Active
           </span>
         );
@@ -151,7 +153,7 @@ export function ModernUserDashboard() {
     <div className="h-full flex flex-col justify-between space-y-4 pb-12 font-sans text-slate-800 animate-in fade-in duration-200 overflow-hidden">
       {/* Top Header Bar */}
       <div className="flex items-center justify-between shrink-0">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="text-2xl font-normal tracking-tight text-slate-900 dark:text-white">
           Dashboard
         </h1>
         <Button
@@ -210,7 +212,7 @@ export function ModernUserDashboard() {
         {/* Help Approvals Queue Card */}
         <div className="lg:col-span-8 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-xs flex flex-col justify-between overflow-hidden">
           <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800 shrink-0">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+            <h2 className="text-sm font-medium text-slate-900 dark:text-white">
               Help Approvals Queue
             </h2>
             <button
@@ -256,7 +258,7 @@ export function ModernUserDashboard() {
         <div className="lg:col-span-4 bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 shadow-xs flex flex-col justify-between overflow-hidden">
           <div className="flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-slate-800 shrink-0">
             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+            <h2 className="text-sm font-medium text-slate-900 dark:text-white">
               Live Activity
             </h2>
           </div>

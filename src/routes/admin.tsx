@@ -57,6 +57,7 @@ import {
 import { ApprovalsManager } from "@/components/admin/ApprovalsManager";
 import { CeoViewToggleBar } from "@/components/admin/CeoViewToggleBar";
 import { ModernUserDashboard } from "@/components/admin/ModernUserDashboard";
+import { GradientUserDashboard } from "@/components/admin/GradientUserDashboard";
 import {
   Tooltip,
   TooltipContent,
@@ -100,7 +101,7 @@ function AdminPage() {
   const { setSection, role } = useHmsStore();
   const { tab: tabParam } = Route.useSearch();
   const [tab, setTab] = useState(tabParam ?? "overview");
-  const [viewMode, setViewMode] = useState<"old" | "new">("new");
+  const [viewMode, setViewMode] = useState<"old" | "new" | "gradient">("gradient");
 
   // Keep the visible tab in sync with deep links (e.g. from the help panel).
   useEffect(() => {
@@ -119,8 +120,8 @@ function AdminPage() {
   if (isLoading || !user) return null;
 
   return (
-    <AppShell>
-      <div className={`p-6 max-w-[1600px] mx-auto relative ${tab === "content" ? "h-full flex flex-col min-h-0 overflow-hidden" : ""}`}>
+    <AppShell darkTheme={viewMode === "gradient"}>
+      <div className={`p-6 max-w-[1600px] mx-auto relative ${viewMode === "gradient" ? "h-full bg-[#050814]" : ""} ${tab === "content" ? "h-full flex flex-col min-h-0 overflow-hidden" : ""}`}>
         <h1 className="sr-only">Help Administration</h1>
 
         {viewMode === "old" && (
@@ -162,7 +163,9 @@ function AdminPage() {
         )}
 
         <div className={`${viewMode === "old" ? "mt-4" : ""} ${tab === "content" ? "flex-1 min-h-0 overflow-hidden" : ""}`}>
-          {viewMode === "new" ? (
+          {viewMode === "gradient" ? (
+            <GradientUserDashboard />
+          ) : viewMode === "new" ? (
             <ModernUserDashboard />
           ) : (
             <>

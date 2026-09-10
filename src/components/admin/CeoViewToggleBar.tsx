@@ -60,8 +60,8 @@ const INITIAL_COMMENTS: CeoComment[] = [
 ];
 
 interface CeoViewToggleBarProps {
-  viewMode: "old" | "new";
-  onViewModeChange: (mode: "old" | "new") => void;
+  viewMode: "old" | "new" | "gradient";
+  onViewModeChange: (mode: "old" | "new" | "gradient") => void;
 }
 
 export function CeoViewToggleBar({ viewMode, onViewModeChange }: CeoViewToggleBarProps) {
@@ -138,8 +138,8 @@ export function CeoViewToggleBar({ viewMode, onViewModeChange }: CeoViewToggleBa
 
           <div className="h-4 w-[1px] bg-slate-700/80 shrink-0" />
 
-          {/* Old vs New Segmented Switch */}
-          <div className="flex items-center bg-slate-900/90 p-1 rounded-full border border-slate-800 shrink-0">
+          {/* Old vs New vs Gradient Segmented Switch */}
+          <div className="flex items-center bg-slate-900/90 p-1 rounded-full border border-slate-800 shrink-0 gap-0.5">
             <button
               type="button"
               onClick={() => onViewModeChange("old")}
@@ -166,6 +166,22 @@ export function CeoViewToggleBar({ viewMode, onViewModeChange }: CeoViewToggleBa
               <span>New UI</span>
               <span className="text-[10px] bg-indigo-400/30 text-indigo-200 px-1.5 py-0.2 rounded-full font-bold">
                 V2
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onViewModeChange("gradient")}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                viewMode === "gradient"
+                  ? "bg-gradient-to-r from-[#0029FF] to-[#00144B] text-white shadow-md shadow-blue-500/30 font-semibold border border-blue-400/40"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Sparkles className="h-3.5 w-3.5 text-cyan-300" />
+              <span>Gradient</span>
+              <span className="text-[10px] bg-blue-500/30 text-cyan-200 px-1.5 py-0.2 rounded-full font-bold">
+                V3
               </span>
             </button>
           </div>
