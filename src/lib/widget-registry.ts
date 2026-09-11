@@ -6,10 +6,15 @@ import {
   Library,
   Users,
   AlertTriangle,
+  ClipboardCheck,
+  CheckCircle2,
+  Activity,
 } from "lucide-react";
 import type { Role } from "@/lib/types";
 
 export type WidgetWidth = "third" | "half" | "two-thirds" | "full";
+
+export type WidgetCategory = "for_review" | "for_follow_up" | "for_info" | "for_monitoring";
 
 export interface WidgetConfig {
   id: string;
@@ -17,6 +22,7 @@ export interface WidgetConfig {
   description: string;
   icon: ComponentType<{ className?: string }>;
   defaultWidth: WidgetWidth;
+  category: WidgetCategory;
   /** Roles allowed to view/add this widget. If empty/undefined, available to all. */
   allowedRoles?: Role[];
 }
@@ -62,43 +68,12 @@ export function getWidgetWidthLabel(width: WidgetWidth): string {
 /** Registry of all available widgets on the system. */
 export const ALL_WIDGETS: WidgetConfig[] = [
   {
-    id: "help_management",
-    title: "Help Management",
-    description: "Library health across every registered area",
-    icon: LifeBuoy,
-    defaultWidth: "half",
-    allowedRoles: ["admin", "sub_admin", "customer"],
-  },
-  {
-    id: "ticket_management",
-    title: "Ticket Management",
-    description: "Support requests raised from the help panel",
-    icon: TicketIcon,
-    defaultWidth: "half",
-    allowedRoles: ["admin", "sub_admin", "customer"],
-  },
-  {
-    id: "activity_graph",
-    title: "Activity",
-    description: "Help views and ticket volume over the last 12 weeks",
-    icon: BarChart3,
-    defaultWidth: "half",
-    allowedRoles: ["admin", "sub_admin", "customer"],
-  },
-  {
-    id: "coverage_metrics",
-    title: "Coverage",
-    description: "How much of the application has published help",
-    icon: Library,
-    defaultWidth: "half",
-    allowedRoles: ["admin", "sub_admin", "customer"],
-  },
-  {
-    id: "user_management",
-    title: "User Management",
-    description: "Workspace roles and account overview",
-    icon: Users,
-    defaultWidth: "half",
+    id: "help_approvals",
+    title: "Approval Queue",
+    description: "Pending help article review queue and SLA status",
+    icon: CheckCircle2,
+    defaultWidth: "full",
+    category: "for_review",
     allowedRoles: ["admin", "sub_admin", "customer"],
   },
   {
@@ -107,16 +82,68 @@ export const ALL_WIDGETS: WidgetConfig[] = [
     description: "High priority gaps requiring documentation",
     icon: AlertTriangle,
     defaultWidth: "full",
+    category: "for_info",
+    allowedRoles: ["admin", "sub_admin", "customer"],
+  },
+  {
+    id: "usage_analytics",
+    title: "Usage Analytics",
+    description: "Help panel opens, article views, searches, and activity series",
+    icon: BarChart3,
+    defaultWidth: "full",
+    category: "for_monitoring",
+    allowedRoles: ["admin", "sub_admin", "customer"],
+  },
+  {
+    id: "live_activity",
+    title: "Live Activity",
+    description: "Real-time user actions and updates feed",
+    icon: Activity,
+    defaultWidth: "half",
+    category: "for_monitoring",
+    allowedRoles: ["admin", "sub_admin", "customer"],
+  },
+  {
+    id: "ticket_management",
+    title: "Ticket Management",
+    description: "Support requests raised from the help panel",
+    icon: TicketIcon,
+    defaultWidth: "half",
+    category: "for_follow_up",
+    allowedRoles: ["admin", "sub_admin", "customer"],
+  },
+  {
+    id: "help_management",
+    title: "Help Management",
+    description: "Library health across every registered area",
+    icon: LifeBuoy,
+    defaultWidth: "half",
+    category: "for_follow_up",
+    allowedRoles: ["admin", "sub_admin", "customer"],
+  },
+  {
+    id: "coverage_metrics",
+    title: "Coverage Metrics",
+    description: "How much of the application has published help",
+    icon: Library,
+    defaultWidth: "half",
+    category: "for_info",
+    allowedRoles: ["admin", "sub_admin", "customer"],
+  },
+  {
+    id: "user_management",
+    title: "User Management",
+    description: "Workspace roles and account overview",
+    icon: Users,
+    defaultWidth: "half",
+    category: "for_info",
     allowedRoles: ["admin", "sub_admin", "customer"],
   },
 ];
 
 const DEFAULT_WIDGET_ORDER: UserWidgetState[] = [
-  { id: "help_management", width: "half", order: 0 },
-  { id: "ticket_management", width: "half", order: 1 },
-  { id: "activity_graph", width: "half", order: 2 },
-  { id: "coverage_metrics", width: "half", order: 3 },
-  { id: "user_management", width: "half", order: 4 },
+  { id: "help_approvals", width: "two-thirds", order: 0 },
+  { id: "live_activity", width: "third", order: 1 },
 ];
 
 /** Get all widgets allowed for a user's role based on permission rules. */

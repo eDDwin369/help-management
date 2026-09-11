@@ -55,9 +55,7 @@ import {
   Info,
 } from "lucide-react";
 import { ApprovalsManager } from "@/components/admin/ApprovalsManager";
-import { CeoViewToggleBar } from "@/components/admin/CeoViewToggleBar";
 import { ModernUserDashboard } from "@/components/admin/ModernUserDashboard";
-import { GradientUserDashboard } from "@/components/admin/GradientUserDashboard";
 import {
   Tooltip,
   TooltipContent,
@@ -98,10 +96,9 @@ const TAB_SECTION: Record<string, string> = {
 function AdminPage() {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
-  const { setSection, role } = useHmsStore();
+  const { setSection } = useHmsStore();
   const { tab: tabParam } = Route.useSearch();
   const [tab, setTab] = useState(tabParam ?? "overview");
-  const [viewMode, setViewMode] = useState<"old" | "new" | "gradient">("gradient");
 
   // Keep the visible tab in sync with deep links (e.g. from the help panel).
   useEffect(() => {
@@ -120,66 +117,17 @@ function AdminPage() {
   if (isLoading || !user) return null;
 
   return (
-    <AppShell darkTheme={viewMode === "gradient"}>
-      <div className={`p-6 max-w-[1600px] mx-auto relative ${viewMode === "gradient" ? "h-full bg-[#050814]" : ""} ${tab === "content" ? "h-full flex flex-col min-h-0 overflow-hidden" : ""}`}>
+    <AppShell>
+      <div className="p-6 max-w-[1600px] mx-auto relative h-full flex flex-col min-h-0 overflow-hidden">
         <h1 className="sr-only">Help Administration</h1>
 
-        {viewMode === "old" && (
-          <>
-            <div className="flex items-center justify-between mb-1.5 pl-0.5 shrink-0">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground/80 font-medium">
-                <ChevronRight className="size-3 text-muted-foreground/60 shrink-0" />
-                <span>{user?.role === "admin" ? "SuperAdmin" : "User Role View"}</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-[11px] bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20">
-                  Classic Old UI
-                </Badge>
-              </div>
-            </div>
-
-            <Tabs value={tab} onValueChange={setTab} className={tab === "content" ? "shrink-0" : ""}>
-              <TabsList className="bg-transparent border-b w-full justify-start h-auto p-0 rounded-none gap-1">
-                {[
-                  { v: "overview", label: "Dashboard", icon: LayoutDashboard, context: "admin-overview-tab" },
-                  { v: "content", label: "Approvals", icon: CheckCircle2, context: "admin-content-library-tab" },
-                  { v: "coverage", label: "Areas Without Help", icon: AlertTriangle, context: "admin-coverage-tab" },
-                  { v: "usage", label: "Usage Analytics", icon: BarChart3, context: "admin-usage-tab" },
-                ].map((t) => (
-                  <TabsTrigger
-                    key={t.v}
-                    value={t.v}
-                    data-hms-context={t.context}
-                    className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none px-4 py-3 gap-2"
-                  >
-                    <t.icon className="size-4" />
-                    {t.label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          </>
-        )}
-
-        <div className={`${viewMode === "old" ? "mt-4" : ""} ${tab === "content" ? "flex-1 min-h-0 overflow-hidden" : ""}`}>
-          {viewMode === "gradient" ? (
-            <GradientUserDashboard />
-          ) : viewMode === "new" ? (
-            <ModernUserDashboard />
-          ) : (
-            <>
-              {tab === "overview" && <OverviewTab />}
-              {tab === "content" && <ApprovalsManager canApprove={user?.role === "admin"} />}
-              {tab === "coverage" && <CoverageTab />}
-              {tab === "usage" && <UsageTab />}
-            </>
-          )}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {tab === "overview" && <ModernUserDashboard />}
+          {tab === "content" && <ApprovalsManager canApprove={user?.role === "admin"} />}
+          {tab === "coverage" && <CoverageTab />}
+          {tab === "usage" && <UsageTab />}
         </div>
       </div>
-
-      {/* Floating CEO Control & Old/New UI Toggle Bar */}
-      <CeoViewToggleBar viewMode={viewMode} onViewModeChange={setViewMode} />
     </AppShell>
   );
 }
