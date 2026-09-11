@@ -33,6 +33,9 @@ import {
   Sparkles,
   Headphones,
   PlusCircle,
+  Info,
+  Home,
+  ExternalLink,
 } from "lucide-react";
 import {
   useHmsStore,
@@ -301,6 +304,142 @@ function PrioritySelect({
 }
 
 
+function ImageOrFallback({
+  src,
+  fallback,
+  alt,
+  className,
+}: {
+  src: string;
+  fallback: React.ReactNode;
+  alt: string;
+  className?: string;
+}) {
+  const [error, setError] = useState(false);
+  if (error || !src) return <>{fallback}</>;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setError(true)}
+      className={className ?? "w-20 h-20 object-contain mx-auto transition-transform hover:scale-105"}
+    />
+  );
+}
+
+function SvgAvatarBow() {
+  return (
+    <div className="w-7 h-7 rounded-md bg-amber-400/20 border border-amber-400/50 flex items-center justify-center p-0.5 shadow-xs overflow-hidden shrink-0">
+      <svg viewBox="0 0 40 40" className="w-full h-full">
+        <circle cx="20" cy="14" r="7" fill="#1E293B" />
+        <circle cx="20" cy="15" r="5.5" fill="#FCD34D" />
+        <path d="M12 36 C12 24, 16 22, 20 22 C24 22, 28 24, 28 36" fill="#F59E0B" />
+        <path d="M16 26 C18 28, 22 28, 24 26" stroke="#D97706" strokeWidth="2" strokeLinecap="round" fill="none" />
+      </svg>
+    </div>
+  );
+}
+
+function SvgPresentSummary() {
+  return (
+    <div className="w-20 h-20 relative flex items-center justify-center">
+      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-xs">
+        <rect x="52" y="15" width="32" height="42" rx="4" fill="#EFF6FF" stroke="#3B82F6" strokeWidth="1.5" />
+        <line x1="58" y1="25" x2="76" y2="25" stroke="#93C5FD" strokeWidth="2" strokeLinecap="round" />
+        <line x1="58" y1="32" x2="72" y2="32" stroke="#93C5FD" strokeWidth="2" strokeLinecap="round" />
+        <line x1="58" y1="39" x2="78" y2="39" stroke="#93C5FD" strokeWidth="2" strokeLinecap="round" />
+        <circle cx="78" cy="22" r="3" fill="#3B82F6" />
+        <circle cx="34" cy="30" r="12" fill="#1E293B" />
+        <circle cx="34" cy="32" r="9.5" fill="#FCD34D" />
+        <circle cx="34" cy="18" r="4" fill="#1E293B" />
+        <path d="M16 80 L22 48 L46 48 L52 80 Z" fill="#F59E0B" />
+        <path d="M22 52 L42 62 L58 48" stroke="#D97706" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <rect x="36" y="55" width="28" height="20" rx="3" fill="#334155" stroke="#E2E8F0" strokeWidth="1" />
+        <rect x="39" y="58" width="22" height="14" rx="1.5" fill="#38BDF8" opacity="0.8" />
+      </svg>
+    </div>
+  );
+}
+
+function SvgTalkToMe() {
+  return (
+    <div className="w-20 h-20 relative flex items-center justify-center">
+      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-xs">
+        <path d="M72 26 C76 30, 76 36, 72 40" stroke="#8B5CF6" strokeWidth="2" strokeLinecap="round" fill="none" />
+        <path d="M77 22 C83 28, 83 38, 77 44" stroke="#A78BFA" strokeWidth="2" strokeLinecap="round" fill="none" />
+        <circle cx="65" cy="33" r="3" fill="#7C3AED" />
+        <line x1="65" y1="36" x2="65" y2="42" stroke="#7C3AED" strokeWidth="1.5" />
+        <circle cx="36" cy="30" r="12" fill="#1E293B" />
+        <circle cx="36" cy="32" r="9.5" fill="#FCD34D" />
+        <circle cx="36" cy="18" r="4" fill="#1E293B" />
+        <path d="M25 32 C25 20, 47 20, 47 32" stroke="#475569" strokeWidth="2.5" fill="none" />
+        <rect x="23" y="29" width="4" height="7" rx="2" fill="#475569" />
+        <rect x="45" y="29" width="4" height="7" rx="2" fill="#475569" />
+        <path d="M18 80 L24 48 L48 48 L54 80 Z" fill="#F59E0B" />
+        <path d="M30 68 L60 68 L64 78 L26 78 Z" fill="#94A3B8" />
+        <rect x="34" y="52" width="22" height="16" rx="2" fill="#475569" />
+        <rect x="36" y="54" width="18" height="12" rx="1" fill="#60A5FA" opacity="0.8" />
+      </svg>
+    </div>
+  );
+}
+
+function SvgMayIHelpYou() {
+  return (
+    <div className="w-24 h-24 relative flex items-center justify-center">
+      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-xs">
+        <circle cx="48" cy="24" r="14" fill="#1E293B" />
+        <circle cx="48" cy="26" r="11" fill="#FCD34D" />
+        <path d="M36 22 C42 16, 54 16, 60 22" fill="#1E293B" />
+        <path d="M42 26 C44 24, 46 24, 47 26" stroke="#78350F" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+        <path d="M50 26 C52 24, 54 24, 55 26" stroke="#78350F" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+        <path d="M46 31 C48 33, 50 33, 52 31" stroke="#D97706" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+        <path d="M22 84 C24 44, 40 40, 56 46 L76 72 L66 84 Z" fill="#F59E0B" />
+        <path d="M40 50 C46 54, 52 56, 54 64" stroke="#D97706" strokeWidth="4" strokeLinecap="round" fill="none" />
+        <circle cx="55" cy="65" r="3.5" fill="#FCD34D" />
+      </svg>
+    </div>
+  );
+}
+
+function SvgHelpMe() {
+  return (
+    <div className="w-20 h-20 relative flex items-center justify-center">
+      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-xs">
+        <text x="66" y="28" fill="#F59E0B" fontSize="22" fontWeight="bold" fontFamily="sans-serif">?</text>
+        <circle cx="34" cy="36" r="11" fill="#1E293B" />
+        <circle cx="34" cy="38" r="8.5" fill="#FCD34D" />
+        <circle cx="34" cy="25" r="4" fill="#1E293B" />
+        <path d="M42 54 L58 32" stroke="#F59E0B" strokeWidth="5" strokeLinecap="round" />
+        <circle cx="60" cy="30" r="4" fill="#FCD34D" />
+        <path d="M18 85 L24 54 L44 54 L50 85 Z" fill="#F59E0B" />
+        <rect x="10" y="76" width="75" height="6" rx="2" fill="#E2E8F0" />
+      </svg>
+    </div>
+  );
+}
+
+function SvgTeachMe() {
+  return (
+    <div className="w-20 h-20 relative flex items-center justify-center">
+      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-xs">
+        <polygon points="68,14 84,20 68,26 52,20" fill="#6366F1" />
+        <rect x="63" y="23" width="10" height="5" fill="#4F46E5" />
+        <line x1="80" y1="21" x2="84" y2="30" stroke="#EEF2FF" strokeWidth="1.5" />
+        <circle cx="30" cy="38" r="10" fill="#1E293B" />
+        <circle cx="30" cy="40" r="8" fill="#FCD34D" />
+        <path d="M16 85 L22 54 L40 54 L44 85 Z" fill="#F59E0B" />
+        <circle cx="66" cy="38" r="10" fill="#1E293B" />
+        <circle cx="66" cy="40" r="8" fill="#FCD34D" />
+        <path d="M52 85 L56 54 L76 54 L80 85 Z" fill="#1E3A8A" />
+        <rect x="25" y="70" width="46" height="12" rx="2" fill="#CBD5E1" />
+        <rect x="35" y="65" width="26" height="14" rx="1.5" fill="#FFFFFF" stroke="#94A3B8" strokeWidth="1" />
+        <line x1="48" y1="65" x2="48" y2="79" stroke="#94A3B8" strokeWidth="1" />
+      </svg>
+    </div>
+  );
+}
+
 // ---------- HEADER ----------
 
 function Header({
@@ -322,54 +461,62 @@ function Header({
         onDragStart?.(e);
       }}
       style={{
-        height: 44,
-        backgroundColor: NAVY,
+        height: 48,
+        backgroundColor: "#0B1736",
         borderRadius: "10px 10px 0 0",
         padding: "0 12px",
       }}
     >
-      <div className="flex items-center flex-1 min-w-0" style={{ gap: 6 }}>
+      <div className="flex items-center flex-1 min-w-0 gap-2">
         {onBack && (
           <button
             onClick={onBack}
             aria-label="Back"
-            className="flex items-center justify-center rounded hover:bg-white/10 -ml-1 mr-1"
+            className="flex items-center justify-center rounded hover:bg-white/10"
             style={{ width: 28, height: 28 }}
           >
-            <ChevronLeft style={{ width: 14, height: 14, color: "#9CA3AF" }} />
+            <ChevronLeft className="w-4 h-4 text-slate-300" />
           </button>
         )}
-        <span
-          className="inline-flex items-center"
-          style={{
-            backgroundColor: "#1C3054",
-            borderRadius: 4,
-            padding: "3px 8px",
-            gap: 3,
-          }}
-        >
-          <span style={{ color: "#F59E0B", fontSize: 10, fontWeight: 700 }}>★</span>
-          <span style={{ color: "white", fontSize: 10, fontWeight: 600 }}>HMS</span>
-        </span>
-        <span
-          className="shrink-0"
-          style={{ width: 1, height: 16, backgroundColor: "#2D4060", margin: "0 8px" }}
+        <ImageOrFallback
+          src="/images/avatar-bow.png"
+          fallback={<SvgAvatarBow />}
+          alt="HMS Avatar"
+          className="w-7 h-7 object-contain rounded-lg"
         />
-        <span
-          className="truncate"
-          style={{ color: "white", fontSize: 13, fontWeight: 600 }}
-        >
-          {crumb}
+        <span className="truncate text-sm font-bold text-white font-['DM_Sans',sans-serif]">
+          {crumb.split(" › ")[0] || "Site Recordings"}
         </span>
       </div>
-      <button
-        onClick={onClose}
-        aria-label="Close"
-        className="flex items-center justify-center rounded hover:bg-white/10"
-        style={{ width: 32, height: 32 }}
-      >
-        <X style={{ width: 16, height: 16, color: "#9CA3AF" }} />
-      </button>
+
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => toast.info("HMS Contextual Assistant v2.0")}
+          aria-label="Info"
+          title="Info"
+          className="flex items-center justify-center rounded hover:bg-white/10 w-7 h-7 text-slate-400 hover:text-white"
+        >
+          <Info className="w-4 h-4" />
+        </button>
+
+        <button
+          onClick={() => toast.info("Expanded view mode")}
+          aria-label="Expand"
+          title="Expand"
+          className="flex items-center justify-center rounded hover:bg-white/10 w-7 h-7 text-slate-400 hover:text-white"
+        >
+          <Maximize2 className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          title="Close"
+          className="flex items-center justify-center rounded hover:bg-white/10 w-7 h-7 text-slate-400 hover:text-white"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -797,241 +944,150 @@ function ListView({
   onContentLibrary: () => void;
   goTo: (v: View) => void;
 }) {
-  const { state, contextKey, context } = useHmsStore();
-  const [search, setSearch] = useState("");
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [filters, setFilters] = useState<Filters>({
-    types: [],
-    archive: "active",
-    // Admins land on the customer-equivalent view: active + approved only.
-    approval: role === "admin" ? "approved" : "all",
-  });
-  const [page, setPage] = useState(1);
+  const { state, context } = useHmsStore();
+  const [showMayIHelp, setShowMayIHelp] = useState(true);
 
-  // Rows are a fixed 40px tall — derive how many fit the available body height
-  // so the list always fills the panel before paginating.
-  const ROW_H = 40;
-  const listRef = useRef<HTMLDivElement>(null);
-  const [pageSize, setPageSize] = useState(8);
-
+  // Automatically hide "May i Help You ?" after 5 seconds and transition to the 4 main icons
   useEffect(() => {
-    const el = listRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const measure = () => {
-      const fit = Math.floor(el.clientHeight / ROW_H);
-      setPageSize(Math.max(3, fit));
-    };
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
+    const timer = setTimeout(() => {
+      setShowMayIHelp(false);
+    }, 5000);
+    return () => clearTimeout(timer);
   }, []);
 
-  // Debounced query keeps large libraries from re-filtering on every keystroke.
-  const [query, setQuery] = useState("");
-  useEffect(() => {
-    const t = setTimeout(() => setQuery(search), 180);
-    return () => clearTimeout(t);
-  }, [search]);
-
-  const typeKey = filters.types.join(",");
-  const filterCount =
-    (filters.types.length > 0 ? 1 : 0) +
-    (role !== "customer" && filters.archive !== "active" ? 1 : 0) +
-    (role === "admin" && filters.approval !== "approved" ? 1 : 0);
-
-  const filtered = useMemo(
-    () => getFilteredArticles(state.articles, role, contextKey, filters, query),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.articles, role, contextKey, typeKey, filters.archive, filters.approval, query],
-  );
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
-
-  useEffect(() => {
-    setPage(1);
-  }, [search, typeKey, filters.archive, filters.approval, pageSize]);
-
-  // --- usage analytics ---
-  useEffect(() => {
-    const q = query.trim();
-    if (q.length > 1) trackHmsEvent("search", { label: q, role, contextKey });
-  }, [query, role, contextKey]);
-
-  useEffect(() => {
-    if (filterCount === 0) return;
-    trackHmsEvent("filter_change", {
-      label: `types:${typeKey || "all"} archive:${filters.archive} approval:${filters.approval}`,
-      role,
-      contextKey,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [typeKey, filters.archive, filters.approval]);
-
-  const isEmpty = filtered.length === 0;
-
   return (
-    <>
-      <SearchBar
-        value={search}
-        onChange={setSearch}
-        filterCount={filterCount}
-        onToggleFilter={() => setFilterOpen((v) => !v)}
-        filterOpen={filterOpen}
-      />
-      <div className="relative flex-1 flex flex-col min-h-0">
-        {filterOpen && (
-          <FilterDropdown
-            role={role}
-            filters={filters}
-            setFilters={setFilters}
-            onSelected={() => setFilterOpen(false)}
-          />
-        )}
-        {((role !== "customer" && !isEmpty) || (search.trim().length > 0 && !isEmpty)) && (
-          <div
-            className="flex items-center justify-between shrink-0"
-            style={{
-              height: 28,
-              backgroundColor: "#FAFAFA",
-              borderBottom: "0.8px solid #F3F4F6",
-              padding: "0 12px",
-            }}
-          >
-            <span
-              className="uppercase font-semibold"
-              style={{ fontSize: 10, color: "#9CA3AF", letterSpacing: "0.5px" }}
-            >
-              Related articles
-            </span>
-            <span style={{ fontSize: 10, color: "#9CA3AF" }}>
-              {filtered.length} results
-            </span>
-          </div>
-        )}
-        <div
-          ref={listRef}
-          className="flex-1 min-h-0 overflow-y-auto hms-scroll"
-          role={isEmpty ? undefined : "list"}
-          aria-label={isEmpty ? undefined : "Related help articles"}
-        >
-          {((role !== "customer" && !isEmpty) || (search.trim().length > 0 && !isEmpty)) &&
-            paged.map((a) => (
-              <button
-                key={a.id}
-                role="listitem"
-                aria-label={`${a.contentType} article: ${a.title}`}
-                onClick={() => onOpenArticle(a.id)}
-                className="flex items-center w-full text-left hover:bg-[#FAFAFA]"
-                style={{
-                  height: ROW_H,
-                  padding: "0 12px",
-                  gap: 10,
-                  borderBottom: "0.8px solid #F3F4F6",
-                  backgroundColor: "white",
-                }}
-              >
-                <TypeBox t={a.contentType} />
-                <span
-                  className="flex-1 truncate"
-                  style={{ fontSize: 12, fontWeight: 500, color: "#111827" }}
-                >
-                  {a.title}
-                </span>
-                {role !== "customer" &&
-                  (a.archiveStatus === "archived" ? (
-                    <ArchivedBadge />
-                  ) : (
-                    <ApprovalBadge status={a.approvalStatus} />
-                  ))}
-                <ChevronRight style={{ width: 12, height: 12, color: "#D1D5DB" }} />
-              </button>
-            ))}
-
-          {/* AI Assistant Welcome Greeting & Clickable Chips (First Message) */}
-          <div className="p-4 bg-gradient-to-b from-white via-purple-50/20 to-pink-50/20 space-y-3">
-            <p className="text-xs font-semibold text-gray-900 leading-relaxed">
-              Hello! Curious about what you're watching? I'm here to help.
-            </p>
-            <p className="text-xs text-gray-500 font-medium">
-              Not sure what to ask? Choose something:
-            </p>
-
-            <div className="flex flex-col items-end space-y-2 pt-1">
-              <button
-                type="button"
-                onClick={() =>
-                  goTo({
-                    name: "ai-chat",
-                    initialPrompt: `Summarize ${context.split(" › ")[0] || "this page"}`,
-                  })
-                }
-                className="px-3.5 py-1.5 rounded-full border border-gray-300 bg-white hover:bg-purple-50 hover:border-purple-300 text-xs font-medium text-gray-800 transition-all shadow-xs hover:shadow active:scale-95 text-right cursor-pointer"
-              >
-                Summarize {context.split(" › ")[0] || "the page"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  goTo({ name: "ai-chat", initialPrompt: "Recommend related content" })
-                }
-                className="px-3.5 py-1.5 rounded-full border border-gray-300 bg-white hover:bg-purple-50 hover:border-purple-300 text-xs font-medium text-gray-800 transition-all shadow-xs hover:shadow active:scale-95 text-right cursor-pointer"
-              >
-                Recommend related content
-              </button>
-
-              {state.articles
-                .filter((a) => a.approvalStatus === "approved")
-                .slice(0, 2)
-                .map((art) => (
-                  <button
-                    key={`chip-${art.id}`}
-                    type="button"
-                    onClick={() => goTo({ name: "ai-chat", initialPrompt: art.title })}
-                    className="px-3.5 py-1.5 rounded-full border border-gray-300 bg-white hover:bg-purple-50 hover:border-purple-300 text-xs font-medium text-gray-800 transition-all shadow-xs hover:shadow active:scale-95 text-right cursor-pointer truncate max-w-[240px]"
-                  >
-                    {art.title}
-                  </button>
-                ))}
-            </div>
-          </div>
+    <div className="flex-1 flex flex-col min-h-0 bg-white overflow-hidden">
+      {/* Sub-header Breadcrumb Bar */}
+      <div className="flex items-center justify-between px-3 py-2 bg-[#F4F6FB] border-b border-slate-200/80 text-xs font-semibold text-slate-800 shrink-0 select-none">
+        <div className="flex items-center gap-2 min-w-0">
+          <Home className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+          <span className="truncate">{context || "Site Recordings"}</span>
         </div>
-        {!isEmpty && filtered.length > pageSize && (
-          <div
-            className="flex items-center justify-between shrink-0"
-            style={{
-              padding: "6px 12px",
-              fontSize: 11,
-              color: "#6B7280",
-              borderTop: "0.8px solid #F3F4F6",
-              backgroundColor: "#FAFAFA",
-            }}
+        {!showMayIHelp && (
+          <button
+            onClick={() => setShowMayIHelp(true)}
+            className="text-[10px] text-amber-600 hover:underline font-medium shrink-0 cursor-pointer"
           >
+            Replay Greeting
+          </button>
+        )}
+      </div>
+
+      {/* Main Container - NO Cropping, Fits 100% */}
+      <div className="flex-1 p-3 bg-white flex flex-col justify-center items-center overflow-hidden select-none relative">
+        {showMayIHelp ? (
+          /* STEP 1: Initial "May i Help You ?" Greeting (Disappears after 5 sec) */
+          <div className="flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-300 space-y-2 py-4">
             <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={safePage === 1}
-              aria-label="Previous page"
-              className="disabled:text-gray-300"
+              type="button"
+              onClick={() => {
+                setShowMayIHelp(false);
+                goTo({ name: "ai-chat", initialPrompt: "Hello! How can I help you today?" });
+              }}
+              className="flex flex-col items-center justify-center p-3 rounded-2xl hover:bg-amber-50/50 transition-all hover:scale-105 active:scale-95 group cursor-pointer"
             >
-              ‹ Prev
+              <ImageOrFallback
+                src="/images/may-i-help.png"
+                fallback={<SvgMayIHelpYou />}
+                alt="May i Help You ?"
+                className="w-36 h-36 object-contain mx-auto drop-shadow-md"
+              />
+              <span className="text-base font-bold text-slate-900 group-hover:text-blue-600 mt-2">
+                May i Help You ?
+              </span>
             </button>
-            <span aria-live="polite">
-              Page {safePage} of {totalPages}
-            </span>
+            <p className="text-[11px] text-slate-400 font-medium animate-pulse">
+              Showing options in 5s or tap above...
+            </p>
+          </div>
+        ) : (
+          /* STEP 2: 4 Icons Displayed at a time (2x2 Grid, NO cropping, NO scrollbars) */
+          <div className="grid grid-cols-2 gap-3 w-full h-full items-center justify-center animate-in fade-in duration-300">
+            {/* 1. Present me Summary */}
             <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={safePage === totalPages}
-              aria-label="Next page"
-              className="disabled:text-gray-300"
+              type="button"
+              onClick={() =>
+                goTo({
+                  name: "ai-chat",
+                  initialPrompt: `Summarize ${context.split(" › ")[0] || "Site Recordings"}`,
+                })
+              }
+              className="flex flex-col items-center justify-center p-2 rounded-2xl hover:bg-slate-50 border border-slate-100 hover:border-blue-200 transition-all hover:scale-102 active:scale-95 group cursor-pointer h-full"
             >
-              Next ›
+              <ImageOrFallback
+                src="/images/present-summary.png"
+                fallback={<SvgPresentSummary />}
+                alt="Present me Summary"
+                className="w-20 h-20 object-contain mx-auto"
+              />
+              <span className="text-xs font-semibold text-slate-700 group-hover:text-blue-600 mt-1 text-center leading-tight">
+                Present me Summary
+              </span>
+            </button>
+
+            {/* 2. Talk to me */}
+            <button
+              type="button"
+              onClick={() => {
+                toast.info("Listening... Speak your question now 🎙️");
+                goTo({ name: "ai-chat", initialPrompt: "Talk to me" });
+              }}
+              className="flex flex-col items-center justify-center p-2 rounded-2xl hover:bg-slate-50 border border-slate-100 hover:border-blue-200 transition-all hover:scale-102 active:scale-95 group cursor-pointer h-full"
+            >
+              <ImageOrFallback
+                src="/images/talk-to-me.png"
+                fallback={<SvgTalkToMe />}
+                alt="Talk to me"
+                className="w-20 h-20 object-contain mx-auto"
+              />
+              <span className="text-xs font-semibold text-slate-700 group-hover:text-blue-600 mt-1 text-center leading-tight">
+                Talk to me
+              </span>
+            </button>
+
+            {/* 3. Help me */}
+            <button
+              type="button"
+              onClick={() => onContact()}
+              className="flex flex-col items-center justify-center p-2 rounded-2xl hover:bg-slate-50 border border-slate-100 hover:border-blue-200 transition-all hover:scale-102 active:scale-95 group cursor-pointer h-full"
+            >
+              <ImageOrFallback
+                src="/images/help-me.png"
+                fallback={<SvgHelpMe />}
+                alt="Help me"
+                className="w-20 h-20 object-contain mx-auto"
+              />
+              <span className="text-xs font-semibold text-slate-700 group-hover:text-blue-600 mt-1 text-center leading-tight">
+                Help me
+              </span>
+            </button>
+
+            {/* 4. Teach me */}
+            <button
+              type="button"
+              onClick={() =>
+                goTo({
+                  name: "ai-chat",
+                  initialPrompt: `Teach me about ${context.split(" › ")[0] || "Site Recordings"}`,
+                })
+              }
+              className="flex flex-col items-center justify-center p-2 rounded-2xl hover:bg-slate-50 border border-slate-100 hover:border-blue-200 transition-all hover:scale-102 active:scale-95 group cursor-pointer h-full"
+            >
+              <ImageOrFallback
+                src="/images/teach-me.png"
+                fallback={<SvgTeachMe />}
+                alt="Teach me"
+                className="w-20 h-20 object-contain mx-auto"
+              />
+              <span className="text-xs font-semibold text-slate-700 group-hover:text-blue-600 mt-1 text-center leading-tight">
+                Teach me
+              </span>
             </button>
           </div>
         )}
       </div>
 
+      {/* Bottom Floating Action Bar */}
       <HmsBottomBar
         role={role}
         onSendAiPrompt={(prompt) => goTo({ name: "ai-chat", initialPrompt: prompt })}
@@ -1040,7 +1096,20 @@ function ListView({
         onMyRequests={() => goTo({ name: "requests" })}
         onContentLibrary={onContentLibrary}
       />
-    </>
+
+      {/* Footer Bar */}
+      <div className="shrink-0 px-3.5 py-2 bg-[#F8FAFC] border-t border-slate-200/80 flex items-center justify-between text-[11px] text-slate-500 font-medium select-none">
+        <span>{state.articles.length} folders / items</span>
+        <button
+          type="button"
+          onClick={onContentLibrary}
+          className="hover:text-blue-600 flex items-center gap-1 font-semibold transition-colors cursor-pointer"
+        >
+          <span>HMS Panel</span>
+          <ExternalLink className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1380,6 +1449,13 @@ function AiChatView({
             `• Duration & Size: 5 seconds playback duration · 0.33 MB file size.\n` +
             `• Key Highlight: Automatic motion tracking active; site patrol check-in confirmed at Level 2.\n` +
             `• Recommended Action: Review timestamp breakdown below or export raw MP4 video log.`;
+        } else if (contextTitle.toLowerCase().includes("site recordings") || contextTitle.toLowerCase().includes("recordings")) {
+          aiText = `🎥 Site Recordings Executive Summary:\n\n` +
+            `• Overview: 27 active video recordings & 360° patrol sessions captured across Level 2 (KL-Ar-L2 Zone).\n` +
+            `• Key Sessions: Latest entry "structure-plan-1-may-26-19-34-18.mp4" recorded in 1920x960 HD resolution.\n` +
+            `• Activity Log: 14 recent recordings captured with timestamped spatial annotations & motion tracking.\n` +
+            `• Operational Status: All session logs synced & archived. 2 pending inspection items awaiting superadmin sign-off.\n` +
+            `• Recommended Actions: Filter by date range, toggle grid/table view, or bulk export MP4 recordings.`;
         } else {
           aiText = `📊 Executive Manager Summary for ${contextTitle}:\n\n` +
             `• Context & Scope: Real-time operational surveillance, digital twin tracking, and audit logging for ${contextTitle}.\n` +
@@ -1387,6 +1463,23 @@ function AiChatView({
             `• Content Status: 12 approved & archived resources live, 2 items awaiting superadmin review.\n` +
             `• Recommended Action: Review pending items in Approvals or export high-definition playback recordings below.`;
         }
+      } else if (query.includes("teach") || query.includes("guide") || query.includes("tutorial")) {
+        if (contextTitle.toLowerCase().includes("site recordings") || contextTitle.toLowerCase().includes("recordings")) {
+          aiText = `🎓 Site Recordings Complete Guide & Walkthrough:\n\n` +
+            `1️⃣ Search & Filter: Use the top search bar or date picker to narrow down recordings by date or technician.\n` +
+            `2️⃣ View Modes: Toggle between Grid View (360° thumbnail cards) and Table View (detailed metadata rows).\n` +
+            `3️⃣ Playback & Inspection: Click any recording entry to open the high-definition video player with interactive timeline scrubbers.\n` +
+            `4️⃣ Export & Share: Click Bulk Download or right-click any row to generate a shareable audit link.`;
+        } else {
+          aiText = `🎓 Operational Guide for ${contextTitle}:\n\n` +
+            `1️⃣ Contextual Navigation: Right-click any UI control on ${contextTitle} to inspect quick help articles.\n` +
+            `2️⃣ Search Library: Filter guides by content type (Video, PDF, Image, or Article).\n` +
+            `3️⃣ Support Tickets: Use 'Contact Support' to flag issues directly to facility superadmins.`;
+        }
+      } else if (query.includes("talk") || query.includes("hello") || query.includes("may i help")) {
+        aiText = `👋 Hello! I am your AI Assistant for ${contextTitle}.\n\n` +
+          `I can help you analyze site patrol recordings, extract video metadata, answer operational questions, or guide you through exporting logs.\n\n` +
+          `What would you like to explore?`;
       } else if (query.includes("recommend") || query.includes("content")) {
         aiText = `💡 Recommended Manager Resources for ${contextTitle}:\n\n` +
           `• Operational Workflow Guide for ${contextTitle}\n` +

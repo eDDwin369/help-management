@@ -796,9 +796,6 @@ export function ModernUserDashboard() {
           <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
             No widgets added to {activeCard.label}
           </h3>
-          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto leading-relaxed">
-            Customize your {activeCard.label} view by adding relevant widgets for this category.
-          </p>
           <Button
             onClick={() => setAddWidgetOpen(true)}
             style={{ background: "linear-gradient(90deg, #0029FF 0%, #00144B 100%)" }}
