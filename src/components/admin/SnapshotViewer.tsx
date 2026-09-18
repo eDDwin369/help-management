@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { type HmsArticle, getArticleHierarchy } from "@/components/hms/hmsStore";
+import { type HmsArticle, type ContentType, getArticleHierarchy } from "@/components/hms/hmsStore";
 import { SCREEN_IMAGES, COMPONENT_HOTSPOTS, defaultHotspot } from "@/lib/screen-assets";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,9 +20,11 @@ import {
   Video,
   X,
   Sparkles,
+  Folder,
+  FolderOpen,
 } from "lucide-react";
 
-const TYPE_ICON = { video: Video, pdf: FileText, image: ImageIcon, text: FileText } as const;
+const TYPE_ICON = { video: Video, pdf: FileText, image: ImageIcon, text: FileText, folder: Folder } as const;
 
 interface SnapshotViewerProps {
   article: HmsArticle | null;
@@ -138,7 +140,7 @@ export function SnapshotViewer({
                 ? "bg-muted text-muted-foreground"
                 : article.approvalStatus === "approved"
                 ? "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/15 border-emerald-500/30"
-                : article.approvalStatus === "unapproved"
+                : article.approvalStatus === "unapproved" || article.approvalStatus === "rejected"
                 ? "bg-rose-500/15 text-rose-600 hover:bg-rose-500/15 border-rose-500/30"
                 : "bg-amber-500/15 text-amber-600 hover:bg-amber-500/15 border-amber-500/30"
             }`}
@@ -147,9 +149,9 @@ export function SnapshotViewer({
               ? "Archived"
               : article.approvalStatus === "approved"
               ? "Approved"
-              : article.approvalStatus === "unapproved"
+              : article.approvalStatus === "unapproved" || article.approvalStatus === "rejected"
               ? "Rejected"
-              : "Pending Approval"}
+              : "Pending Review"}
           </Badge>
         </div>
 
@@ -180,7 +182,7 @@ export function SnapshotViewer({
       {/* Main Viewer Body Area */}
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
         {/* Rejection Audit Box if Rejected */}
-        {article.approvalStatus === "unapproved" && (
+        {(article.approvalStatus === "unapproved" || article.approvalStatus === "rejected") && (
           <div className="rounded-xl border border-rose-200 bg-rose-50/80 dark:bg-rose-950/40 dark:border-rose-900 p-3.5 text-xs text-rose-900 dark:text-rose-200">
             <div className="flex items-center justify-between gap-2 font-semibold mb-1">
               <div className="flex items-center gap-1.5 text-rose-700 dark:text-rose-400">
@@ -377,6 +379,75 @@ export function SnapshotViewer({
                 )}
               </div>
             )}
+            {article.contentType === "folder" && (
+              <div className="rounded-xl border bg-card p-4 space-y-3">
+                <div className="flex items-center justify-between border-b pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="size-9 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                      <Folder className="size-5" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-sm text-foreground">{article.title}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {article.folderChildren?.length || 3} items inside folder
+                      </div>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                    Folder
+                  </Badge>
+                </div>
+
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {article.description}
+                </p>
+
+                <div className="space-y-1.5 pt-1">
+                  <div className="text-[11px] font-semibold text-foreground uppercase tracking-wider">
+                    Folder Contents ({article.folderChildren?.length || 3} items)
+                  </div>
+                  <div className="divide-y divide-border/60 border rounded-xl overflow-hidden bg-muted/20">
+                    {(article.folderChildren && article.folderChildren.length > 0
+                      ? article.folderChildren
+                      : [
+                          { id: "def-1", name: "Pre-Flight Safety Checklist.pdf", type: "pdf", size: "1.4 MB", approvalStatus: article.approvalStatus },
+                          { id: "def-2", name: "Patrol Protocol Demonstration.mp4", type: "video", size: "8.2 MB", approvalStatus: article.approvalStatus },
+                          { id: "def-3", name: "Incident Contact Hierarchy.pdf", type: "pdf", size: "420 KB", approvalStatus: "approved" },
+                        ]
+                    ).map((child) => {
+                      const ChildIcon = TYPE_ICON[child.type as ContentType] || FileText;
+                      return (
+                        <div key={child.id} className="p-2.5 px-3 flex items-center justify-between text-xs hover:bg-muted/40 transition-colors">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <ChildIcon className="size-4 text-muted-foreground shrink-0" />
+                            <span className="font-medium text-foreground truncate">{child.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {child.size && <span className="text-[10px] text-muted-foreground">{child.size}</span>}
+                            <Badge
+                              variant="outline"
+                              className={`text-[9px] px-1.5 py-0 ${
+                                child.approvalStatus === "approved"
+                                  ? "bg-emerald-50 text-emerald-600 border-emerald-300"
+                                  : child.approvalStatus === "unapproved" || child.approvalStatus === "rejected"
+                                  ? "bg-rose-50 text-rose-600 border-rose-300"
+                                  : "bg-amber-50 text-amber-600 border-amber-300"
+                              }`}
+                            >
+                              {child.approvalStatus === "approved"
+                                ? "Approved"
+                                : child.approvalStatus === "unapproved" || child.approvalStatus === "rejected"
+                                ? "Rejected"
+                                : "Pending Review"}
+                            </Badge>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -396,30 +467,30 @@ export function SnapshotViewer({
         <div className="text-xs text-muted-foreground">
           {canApprove
             ? article.approvalStatus === "approved"
-              ? "This item is approved & published."
-              : article.approvalStatus === "unapproved"
-              ? "This item was rejected."
-              : "Review item and choose an action."
-            : "Help Admin View — Approvals and rejections can only be submitted by Super Admin."}
+              ? "This item is approved and visible to users."
+              : article.approvalStatus === "unapproved" || article.approvalStatus === "rejected"
+              ? "This item was rejected and hidden from users."
+              : "Review this pending submission and choose an action."
+            : "Help Admin View — Approvals and rejections are managed by Superadmin."}
         </div>
 
         {canApprove && (
           <div className="flex items-center gap-2">
-            {article.approvalStatus !== "unapproved" && (
+            {(article.approvalStatus === "pending" || article.approvalStatus === "approved") && (
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 px-3 text-xs text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-950 dark:hover:bg-rose-950/50 gap-1.5"
+                className="h-8 px-3 text-xs text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-950 dark:hover:bg-rose-950/50 gap-1.5 cursor-pointer"
                 onClick={() => onReject(article.id)}
               >
                 <X className="size-3.5" /> Reject
               </Button>
             )}
 
-            {article.approvalStatus !== "approved" && (
+            {(article.approvalStatus === "pending" || article.approvalStatus === "unapproved" || article.approvalStatus === "rejected") && (
               <Button
                 size="sm"
-                className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+                className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 cursor-pointer shadow-xs"
                 onClick={() => onApprove(article.id)}
               >
                 <Check className="size-3.5" /> Approve

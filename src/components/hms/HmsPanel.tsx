@@ -11,6 +11,7 @@ import {
   Filter as FilterIcon,
   Play,
   FileText,
+  Folder,
   Image as ImageIcon,
   MessageSquare,
   CheckCircle2,
@@ -86,7 +87,7 @@ type View =
 
 // ---------- SHARED PRIMITIVES ----------
 
-function typeColors(t: ContentType) {
+function typeColors(t: ContentType): { bg: string; color: string } {
   switch (t) {
     case "video":
       return { bg: "#FFF0F0", color: "#DC2626" };
@@ -96,6 +97,10 @@ function typeColors(t: ContentType) {
       return { bg: "#F0FDF4", color: "#15803D" };
     case "text":
       return { bg: "#F5F3FF", color: "#7C3AED" };
+    case "folder":
+      return { bg: "#FEF3C7", color: "#D97706" };
+    default:
+      return { bg: "#F3F4F6", color: "#6B7280" };
   }
 }
 
@@ -110,16 +115,20 @@ function TypeBox({ t }: { t: ContentType }) {
       {t === "pdf" && <FileText className="size-3.5" />}
       {t === "image" && <ImageIcon className="size-3.5" />}
       {t === "text" && <span className="text-[11px] font-bold">T</span>}
+      {t === "folder" && <Folder className="size-3.5" />}
     </div>
   );
 }
 
+const APPROVAL_MAP: Record<ApprovalStatus, { bg: string; color: string; label: string }> = {
+  approved: { bg: "#F0FDF4", color: "#22C55E", label: "✓ Approved" },
+  pending: { bg: "#FFFBEB", color: "#B45309", label: "Pending Approval" },
+  unapproved: { bg: "#FEE2E2", color: "#EF4444", label: "✕ Rejected" },
+  rejected: { bg: "#FEE2E2", color: "#EF4444", label: "✕ Rejected" },
+};
+
 function ApprovalBadge({ status }: { status: ApprovalStatus }) {
-  const map = {
-    approved: { bg: "#F0FDF4", color: "#22C55E", label: "✓ Approved" },
-    pending: { bg: "#FFFBEB", color: "#B45309", label: "Pending Approval" },
-    unapproved: { bg: "#FEE2E2", color: "#EF4444", label: "✕ Unapproved" },
-  }[status];
+  const map = APPROVAL_MAP[status] ?? APPROVAL_MAP.pending;
   return (
     <span
       className="shrink-0 font-medium"
@@ -947,13 +956,14 @@ function ListView({
   const { state, context } = useHmsStore();
   const [showMayIHelp, setShowMayIHelp] = useState(true);
 
-  // Automatically hide "May i Help You ?" after 5 seconds and transition to the 4 main icons
+  // Automatically hide "May i Help You ?" after 3 seconds and transition to the 4 main icons
   useEffect(() => {
+    if (!showMayIHelp) return;
     const timer = setTimeout(() => {
       setShowMayIHelp(false);
-    }, 5000);
+    }, 3000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [showMayIHelp]);
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-white overflow-hidden">
@@ -976,7 +986,7 @@ function ListView({
       {/* Main Container - NO Cropping, Fits 100% */}
       <div className="flex-1 p-3 bg-white flex flex-col justify-center items-center overflow-hidden select-none relative">
         {showMayIHelp ? (
-          /* STEP 1: Initial "May i Help You ?" Greeting (Disappears after 5 sec) */
+          /* STEP 1: Initial "May i Help You ?" Greeting (Disappears after 3 sec) */
           <div className="flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-300 space-y-2 py-4">
             <button
               type="button"
@@ -997,7 +1007,7 @@ function ListView({
               </span>
             </button>
             <p className="text-[11px] text-slate-400 font-medium animate-pulse">
-              Showing options in 5s or tap above...
+              Showing options in 3s or tap above...
             </p>
           </div>
         ) : (
@@ -1009,7 +1019,7 @@ function ListView({
               onClick={() =>
                 goTo({
                   name: "ai-chat",
-                  initialPrompt: `Summarize ${context.split(" › ")[0] || "Site Recordings"}`,
+                  initialPrompt: "Present me Summary",
                 })
               }
               className="flex flex-col items-center justify-center p-2 rounded-2xl hover:bg-slate-50 border border-slate-100 hover:border-blue-200 transition-all hover:scale-102 active:scale-95 group cursor-pointer h-full"
@@ -1028,10 +1038,12 @@ function ListView({
             {/* 2. Talk to me */}
             <button
               type="button"
-              onClick={() => {
-                toast.info("Listening... Speak your question now 🎙️");
-                goTo({ name: "ai-chat", initialPrompt: "Talk to me" });
-              }}
+              onClick={() =>
+                goTo({
+                  name: "ai-chat",
+                  initialPrompt: "Talk to me",
+                })
+              }
               className="flex flex-col items-center justify-center p-2 rounded-2xl hover:bg-slate-50 border border-slate-100 hover:border-blue-200 transition-all hover:scale-102 active:scale-95 group cursor-pointer h-full"
             >
               <ImageOrFallback
@@ -1048,7 +1060,12 @@ function ListView({
             {/* 3. Help me */}
             <button
               type="button"
-              onClick={() => onContact()}
+              onClick={() =>
+                goTo({
+                  name: "ai-chat",
+                  initialPrompt: "Help me",
+                })
+              }
               className="flex flex-col items-center justify-center p-2 rounded-2xl hover:bg-slate-50 border border-slate-100 hover:border-blue-200 transition-all hover:scale-102 active:scale-95 group cursor-pointer h-full"
             >
               <ImageOrFallback
@@ -1068,7 +1085,7 @@ function ListView({
               onClick={() =>
                 goTo({
                   name: "ai-chat",
-                  initialPrompt: `Teach me about ${context.split(" › ")[0] || "Site Recordings"}`,
+                  initialPrompt: "Teach me",
                 })
               }
               className="flex flex-col items-center justify-center p-2 rounded-2xl hover:bg-slate-50 border border-slate-100 hover:border-blue-200 transition-all hover:scale-102 active:scale-95 group cursor-pointer h-full"
@@ -1090,16 +1107,17 @@ function ListView({
       {/* Bottom Floating Action Bar */}
       <HmsBottomBar
         role={role}
-        onSendAiPrompt={(prompt) => goTo({ name: "ai-chat", initialPrompt: prompt })}
-        onContact={onContact}
-        onAdd={onAdd}
-        onMyRequests={() => goTo({ name: "requests" })}
         onContentLibrary={onContentLibrary}
       />
 
       {/* Footer Bar */}
       <div className="shrink-0 px-3.5 py-2 bg-[#F8FAFC] border-t border-slate-200/80 flex items-center justify-between text-[11px] text-slate-500 font-medium select-none">
-        <span>{state.articles.length} folders / items</span>
+        <span>
+          {role === "customer"
+            ? state.articles.filter((a) => a.approvalStatus === "approved").length
+            : state.articles.length}{" "}
+          folders / items
+        </span>
         <button
           type="button"
           onClick={onContentLibrary}
@@ -1115,260 +1133,27 @@ function ListView({
 
 function HmsBottomBar({
   role,
-  onSendAiPrompt,
-  onContact,
-  onAdd,
-  onMyRequests,
   onContentLibrary,
 }: {
   role: UserRole;
-  onSendAiPrompt: (prompt: string) => void;
-  onContact: () => void;
-  onAdd: () => void;
-  onMyRequests: () => void;
+  onSendAiPrompt?: (prompt: string) => void;
+  onContact?: () => void;
+  onAdd?: () => void;
+  onMyRequests?: () => void;
   onContentLibrary: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [text, setText] = useState("");
-  const [isRecording, setIsRecording] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const toggleExpand = () => {
-    setExpanded(true);
-    setTimeout(() => inputRef.current?.focus(), 120);
-  };
-
-  const handleCollapse = () => {
-    setExpanded(false);
-    setIsRecording(false);
-    setText("");
-  };
-
-  const handleSubmit = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!text.trim()) return;
-    const prompt = text.trim();
-    setText("");
-    setExpanded(false);
-    setIsRecording(false);
-    onSendAiPrompt(prompt);
-  };
-
-  const handleVoice = () => {
-    if (!isRecording) {
-      setIsRecording(true);
-      setExpanded(true);
-      toast.info("Listening... Speak your question now 🎙️");
-    } else {
-      setIsRecording(false);
-      setText("How do I view my site recordings?");
-      toast.success("Voice transcribed! Click Send to ask AI.");
-      setTimeout(() => inputRef.current?.focus(), 120);
-    }
-  };
-
-  const isCustomer = role === "customer";
+  if (role === "customer") return null;
 
   return (
-    <div className="shrink-0 p-3 bg-white border-t border-gray-100 flex flex-col gap-2 relative">
-      <style>{`
-        @keyframes hmsGradientShift {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        @keyframes hmsPulseGlow {
-          0%, 100% { box-shadow: 0 0 14px rgba(255, 0, 127, 0.6), 0 0 28px rgba(168, 85, 247, 0.4); }
-          50% { box-shadow: 0 0 22px rgba(0, 240, 255, 0.85), 0 0 40px rgba(255, 0, 255, 0.7); }
-        }
-        @keyframes hmsShineSweep {
-          0% { transform: translateX(-150%) rotate(25deg); }
-          100% { transform: translateX(250%) rotate(25deg); }
-        }
-      `}</style>
-
-      <svg width="0" height="0" className="absolute invisible">
-        <defs>
-          <linearGradient id="hms-mic-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#2563EB" />
-            <stop offset="50%" stopColor="#9333EA" />
-            <stop offset="100%" stopColor="#F43F5E" />
-          </linearGradient>
-          <linearGradient id="hms-chat-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#7C3AED" />
-            <stop offset="50%" stopColor="#DB2777" />
-            <stop offset="100%" stopColor="#EA580C" />
-          </linearGradient>
-        </defs>
-      </svg>
-
-      <form
-        onSubmit={handleSubmit}
-        className="flex items-center justify-between gap-2 min-h-[44px] w-full relative"
+    <div className="shrink-0 p-2.5 bg-white border-t border-gray-100 flex items-center justify-center text-[11px] text-gray-500">
+      <button
+        type="button"
+        onClick={onContentLibrary}
+        className="hover:text-gray-800 hover:underline flex items-center gap-1 font-medium text-purple-700 cursor-pointer"
       >
-        <button
-          type="button"
-          onClick={toggleExpand}
-          title="Ask AI Assistant"
-          className={`relative rounded-full flex items-center justify-center shrink-0 transition-all duration-400 ease-out group overflow-hidden ${
-            expanded
-              ? "w-0 h-0 opacity-0 scale-50 -translate-x-4 pointer-events-none p-0 border-0"
-              : "size-11 opacity-100 scale-100 translate-x-0 hover:scale-110 active:scale-95 cursor-pointer shadow-md"
-          }`}
-          style={{
-            background:
-              "linear-gradient(135deg, #ff007f 0%, #ff5e00 25%, #a855f7 50%, #00f0ff 75%, #ff007f 100%)",
-            backgroundSize: "300% 300%",
-            animation:
-              "hmsGradientShift 3.5s ease infinite, hmsPulseGlow 2.5s ease-in-out infinite",
-          }}
-        >
-          <span
-            className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/60 to-transparent pointer-events-none"
-            style={{ animation: "hmsShineSweep 2.2s ease-in-out infinite" }}
-          />
-          <span className="absolute inset-0 bg-gradient-to-b from-white/40 via-transparent to-black/20 pointer-events-none" />
-          <span className="size-5 rounded-[9px] rounded-bl-[2px] bg-white/35 flex items-center justify-center backdrop-blur-md text-white font-black shadow-md group-hover:bg-white/50 transition-colors z-10">
-            <Plus className="size-3.5 stroke-[3]" />
-          </span>
-        </button>
-
-        <div
-          className={`flex-1 flex items-center gap-2 bg-gray-50 border transition-all duration-400 ease-out origin-left rounded-2xl ${
-            expanded
-              ? `opacity-100 max-w-full scale-100 px-3 py-2 shadow-sm ${
-                  isRecording
-                    ? "border-red-400 ring-2 ring-red-500/20 bg-red-50/40"
-                    : "border-purple-300 ring-2 ring-purple-500/20"
-                }`
-              : "opacity-0 max-w-0 scale-95 -translate-x-2 border-transparent p-0 overflow-hidden pointer-events-none"
-          }`}
-        >
-          <button
-            type="button"
-            onClick={handleCollapse}
-            title="Close message box"
-            className={`text-gray-400 hover:text-gray-600 p-0.5 rounded-full hover:bg-gray-200/60 transition-all duration-300 shrink-0 ${
-              expanded ? "opacity-100 scale-100" : "opacity-0 scale-50"
-            }`}
-          >
-            <X className="size-4" />
-          </button>
-
-          {isRecording ? (
-            <div
-              onClick={handleVoice}
-              className="flex items-center gap-2 flex-1 cursor-pointer text-xs font-semibold text-purple-700 select-none"
-            >
-              <span className="size-2.5 rounded-full bg-red-500 animate-ping shrink-0" />
-              <span className="truncate">Listening... Click mic to stop</span>
-              <div className="flex items-center gap-0.5 ml-auto shrink-0">
-                <span className="w-1 h-3.5 bg-purple-600 rounded-full animate-bounce [animation-delay:0ms]" />
-                <span className="w-1 h-5 bg-pink-500 rounded-full animate-bounce [animation-delay:150ms]" />
-                <span className="w-1 h-2.5 bg-indigo-600 rounded-full animate-bounce [animation-delay:300ms]" />
-                <span className="w-1 h-4 bg-purple-600 rounded-full animate-bounce [animation-delay:450ms]" />
-              </div>
-            </div>
-          ) : (
-            <input
-              ref={inputRef}
-              type="text"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Ask AI or search help..."
-              className="w-full bg-transparent text-xs text-gray-800 placeholder-gray-400 focus:outline-none"
-            />
-          )}
-        </div>
-
-        <div className="flex items-center gap-1.5 shrink-0 transition-all duration-300">
-          {expanded && (
-            <button
-              type="submit"
-              disabled={!text.trim()}
-              title="Send message to AI"
-              className={`size-9 rounded-full flex items-center justify-center text-white bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 shadow-md transition-all duration-300 shrink-0 ${
-                !text.trim()
-                  ? "disabled:opacity-40 disabled:scale-100"
-                  : "hover:scale-105 active:scale-95 opacity-100 scale-100"
-              }`}
-            >
-              <ArrowUp className="size-4 stroke-[2.8]" />
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={handleVoice}
-            title={isRecording ? "Click to stop recording" : "Voice search"}
-            className={`size-9 rounded-full flex items-center justify-center border transition-all duration-200 shadow-sm hover:shadow hover:scale-105 active:scale-95 ${
-              isRecording
-                ? "bg-red-100 border-red-400 ring-2 ring-red-500/30 animate-pulse text-red-600"
-                : "bg-gradient-to-br from-blue-50/80 via-indigo-50/80 to-purple-50/80 border-purple-100/80 hover:border-purple-300"
-            }`}
-          >
-            <Mic
-              className={`size-4.5 stroke-[2.2] ${isRecording ? "text-red-600" : ""}`}
-              style={{ stroke: isRecording ? undefined : "url(#hms-mic-grad)" }}
-            />
-          </button>
-
-          {isCustomer ? (
-            <button
-              type="button"
-              onClick={onContact}
-              title="Contact support"
-              className="size-9 rounded-full flex items-center justify-center bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-orange-50/80 border border-pink-100/80 hover:border-pink-300 transition-all duration-200 shadow-sm hover:shadow hover:scale-105 active:scale-95"
-            >
-              <Headphones
-                className="size-4.5 stroke-[2.2]"
-                style={{ stroke: "url(#hms-chat-grad)" }}
-              />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onAdd}
-              title="Add Help Article"
-              className="size-9 rounded-full flex items-center justify-center bg-gradient-to-br from-purple-50/80 via-pink-50/80 to-orange-50/80 border border-pink-100/80 hover:border-pink-300 transition-all duration-200 shadow-sm hover:shadow hover:scale-105 active:scale-95"
-            >
-              <PlusCircle
-                className="size-4.5 stroke-[2.2]"
-                style={{ stroke: "url(#hms-chat-grad)" }}
-              />
-            </button>
-          )}
-        </div>
-      </form>
-
-      {isCustomer ? (
-        <button
-          type="button"
-          onClick={onMyRequests}
-          className="w-full text-center text-[11px] text-gray-500 hover:text-gray-800 hover:underline pt-0.5"
-        >
-          My requests
-        </button>
-      ) : (
-        <div className="flex items-center justify-center gap-3 pt-0.5 text-[11px] text-gray-500">
-          <button
-            type="button"
-            onClick={onContentLibrary}
-            className="hover:text-gray-800 hover:underline flex items-center gap-1 font-medium text-purple-700"
-          >
-            <Library className="size-3" />
-            {role === "admin" ? "Approvals" : "My Approvals"}
-          </button>
-          <span>•</span>
-          <button
-            type="button"
-            onClick={onMyRequests}
-            className="hover:text-gray-800 hover:underline"
-          >
-            My requests
-          </button>
-        </div>
-      )}
+        <Library className="size-3" />
+        {role === "admin" ? "Approvals" : "My Approvals"}
+      </button>
     </div>
   );
 }
@@ -1429,65 +1214,62 @@ function AiChatView({
             a.tags.some((t) => t.toLowerCase().includes(query))),
       );
 
-      let aiText = "Here is what I found in OomniEye Help Articles to answer your question:";
-      if (query.includes("timeline") || query.includes("events") || query.includes("timestamp")) {
-        aiText = `⏱️ Timestamp Breakdown & Key Events (${videoName}):\n\n` +
+      let aiText = "Here is what I found in Site Recordings Help to answer your question:";
+      if (query.includes("present") || query.includes("summary") || query.includes("summarize")) {
+        aiText = `Here's a summary of the Site Recordings:\n\n` +
+          `• Overview: 27 active video recordings & 360° patrol sessions captured across Level 2 (KL-Ar-L2 Zone).\n` +
+          `• Key Session: Latest entry "structure-plan-1-may-26-19-34-18.mp4" recorded in 1920x960 HD resolution.\n` +
+          `• Activity Log: 14 recent recordings captured with timestamped spatial annotations & motion tracking.\n` +
+          `• Operational Status: All session logs synced & archived. 2 pending inspection items awaiting review.\n\n` +
+          `💡 Recommended Follow-up Actions:\n` +
+          `1. Would you like to filter Site Recordings by date range or zone?\n` +
+          `2. Would you like to inspect timestamp breakdowns or motion events?\n` +
+          `3. Would you like to export raw MP4 video logs or reports?`;
+      } else if (query.includes("talk")) {
+        aiText = `Sure, let's talk about Site Recordings. What would you like to know?\n\n` +
+          `You can ask me about:\n` +
+          `• Video playback controls & 360° camera angles\n` +
+          `• Site patrol schedules & technician check-ins\n` +
+          `• Technical resolution, timestamps & export options\n\n` +
+          `Feel free to type your question below!`;
+      } else if (query.includes("help")) {
+        aiText = `I can help you with Site Recordings. What do you need help with?\n\n` +
+          `Here are common areas I can assist you with:\n` +
+          `1️⃣ Finding & filtering specific recordings or timestamped events\n` +
+          `2️⃣ Viewing 360° patrol feeds in Grid or Table view\n` +
+          `3️⃣ Exporting HD video logs or sharing recordings\n` +
+          `4️⃣ Raising a support request for missing or corrupted recording files`;
+      } else if (query.includes("teach") || query.includes("guide") || query.includes("tutorial")) {
+        aiText = `I can teach you about Site Recordings. What would you like to learn?\n\n` +
+          `Here is a quick overview of Site Recordings concepts & features:\n\n` +
+          `📹 What are Site Recordings?\n` +
+          `Automated high-definition video captures of site inspections, patrol check-ins, and 360° digital twin walk-throughs.\n\n` +
+          `🔍 Grid vs. Table View\n` +
+          `• Grid View displays video thumbnail cards with playback durations.\n` +
+          `• Table View gives detailed metadata rows including session IDs, resolutions, and file sizes.\n\n` +
+          `⏱️ Timestamp Scrubbing & Motion Detection\n` +
+          `Click any recording to jump to specific motion events or inspect technician check-in timestamps.\n\n` +
+          `💾 Archiving & Exporting\n` +
+          `All recordings are encrypted and auto-archived. You can bulk download or share direct playback links.`;
+      } else if (query.includes("timeline") || query.includes("events") || query.includes("timestamp")) {
+        aiText = `⏱️ Timestamp Breakdown & Key Events (Site Recordings):\n\n` +
           `• 0:00 - 0:01: Video stream initialized at KL-Ar-L2 zone (Session 2).\n` +
           `• 0:01 - 0:03: Motion sensor auto-detects site patrol technician entry.\n` +
           `• 0:03 - 0:05: Verification complete; session recording saved & archived.`;
       } else if (query.includes("technical") || query.includes("specs") || query.includes("resolution")) {
-        aiText = `⚙️ Technical Metadata & Resolution (${videoName}):\n\n` +
-          `• File Name: ${videoName}\n` +
+        aiText = `⚙️ Technical Metadata & Resolution (Site Recordings):\n\n` +
           `• Resolution: 1920x960 (HD Wide-angle Stream)\n` +
           `• Captured Date: May 1, 2026, 07:36 PM\n` +
           `• Session Duration: 5 sec · Session #2 (KL-Ar-L2)\n` +
           `• Session Window: Started May 1, 6:05 PM — Closed May 7, 7:52 PM`;
-      } else if (query.includes("summarize") || query.includes("summary")) {
-        if (isVideoContext) {
-          aiText = `🎥 Executive Video Summary for ${videoName}:\n\n` +
-            `• Overview: High-resolution 1920x960 site recording captured at KL-Ar-L2 (Session 2).\n` +
-            `• Duration & Size: 5 seconds playback duration · 0.33 MB file size.\n` +
-            `• Key Highlight: Automatic motion tracking active; site patrol check-in confirmed at Level 2.\n` +
-            `• Recommended Action: Review timestamp breakdown below or export raw MP4 video log.`;
-        } else if (contextTitle.toLowerCase().includes("site recordings") || contextTitle.toLowerCase().includes("recordings")) {
-          aiText = `🎥 Site Recordings Executive Summary:\n\n` +
-            `• Overview: 27 active video recordings & 360° patrol sessions captured across Level 2 (KL-Ar-L2 Zone).\n` +
-            `• Key Sessions: Latest entry "structure-plan-1-may-26-19-34-18.mp4" recorded in 1920x960 HD resolution.\n` +
-            `• Activity Log: 14 recent recordings captured with timestamped spatial annotations & motion tracking.\n` +
-            `• Operational Status: All session logs synced & archived. 2 pending inspection items awaiting superadmin sign-off.\n` +
-            `• Recommended Actions: Filter by date range, toggle grid/table view, or bulk export MP4 recordings.`;
-        } else {
-          aiText = `📊 Executive Manager Summary for ${contextTitle}:\n\n` +
-            `• Context & Scope: Real-time operational surveillance, digital twin tracking, and audit logging for ${contextTitle}.\n` +
-            `• Session Activity: 14 active camera logs tracked across key facility sectors with instant scrubbing.\n` +
-            `• Content Status: 12 approved & archived resources live, 2 items awaiting superadmin review.\n` +
-            `• Recommended Action: Review pending items in Approvals or export high-definition playback recordings below.`;
-        }
-      } else if (query.includes("teach") || query.includes("guide") || query.includes("tutorial")) {
-        if (contextTitle.toLowerCase().includes("site recordings") || contextTitle.toLowerCase().includes("recordings")) {
-          aiText = `🎓 Site Recordings Complete Guide & Walkthrough:\n\n` +
-            `1️⃣ Search & Filter: Use the top search bar or date picker to narrow down recordings by date or technician.\n` +
-            `2️⃣ View Modes: Toggle between Grid View (360° thumbnail cards) and Table View (detailed metadata rows).\n` +
-            `3️⃣ Playback & Inspection: Click any recording entry to open the high-definition video player with interactive timeline scrubbers.\n` +
-            `4️⃣ Export & Share: Click Bulk Download or right-click any row to generate a shareable audit link.`;
-        } else {
-          aiText = `🎓 Operational Guide for ${contextTitle}:\n\n` +
-            `1️⃣ Contextual Navigation: Right-click any UI control on ${contextTitle} to inspect quick help articles.\n` +
-            `2️⃣ Search Library: Filter guides by content type (Video, PDF, Image, or Article).\n` +
-            `3️⃣ Support Tickets: Use 'Contact Support' to flag issues directly to facility superadmins.`;
-        }
-      } else if (query.includes("talk") || query.includes("hello") || query.includes("may i help")) {
-        aiText = `👋 Hello! I am your AI Assistant for ${contextTitle}.\n\n` +
-          `I can help you analyze site patrol recordings, extract video metadata, answer operational questions, or guide you through exporting logs.\n\n` +
-          `What would you like to explore?`;
       } else if (query.includes("recommend") || query.includes("content")) {
-        aiText = `💡 Recommended Manager Resources for ${contextTitle}:\n\n` +
-          `• Operational Workflow Guide for ${contextTitle}\n` +
+        aiText = `💡 Recommended Manager Resources for Site Recordings:\n\n` +
+          `• Operational Workflow Guide for Site Recordings\n` +
           `• Video Playback & Incident Scrubbing Manual\n` +
           `• Superadmin Audit & Compliance Workflows`;
       } else if (matched.length === 0) {
-        aiText = `📌 Response Summary for "${promptText}":\n\n` +
-          `• Overview: ${contextTitle} provides real-time digital twin monitoring and audit logging.\n` +
+        aiText = `📌 Site Recordings AI Response for "${promptText}":\n\n` +
+          `• Context: Site Recordings provides real-time digital twin monitoring and audit logging.\n` +
           `• Help Articles: Browse related guides below or use the search bar to locate specific operational procedures.`;
       }
 
@@ -1632,14 +1414,33 @@ function AiChatView({
         <div ref={bottomRef} />
       </div>
 
-      <HmsBottomBar
-        role={role}
-        onSendAiPrompt={handleSend}
-        onContact={onContact}
-        onAdd={onAdd}
-        onMyRequests={onMyRequests}
-        onContentLibrary={onContentLibrary}
-      />
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!input.trim()) return;
+          handleSend(input);
+        }}
+        className="shrink-0 p-3 bg-white border-t border-gray-100 flex items-center gap-2"
+      >
+        <div className="flex-1 flex items-center gap-2 bg-gray-50 border border-gray-200 focus-within:border-purple-300 focus-within:ring-2 focus-within:ring-purple-500/20 rounded-2xl px-3 py-2 shadow-sm transition-all">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask AI a question..."
+            className="w-full bg-transparent text-xs text-gray-800 placeholder-gray-400 focus:outline-none"
+          />
+          {input.trim() && (
+            <button
+              type="submit"
+              title="Send message to AI"
+              className="size-7 rounded-full flex items-center justify-center text-white bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 shadow-sm hover:scale-105 active:scale-95 transition-all shrink-0 cursor-pointer"
+            >
+              <ArrowUp className="size-3.5 stroke-[2.8]" />
+            </button>
+          )}
+        </div>
+      </form>
     </div>
   );
 }

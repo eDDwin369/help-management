@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   ClipboardCheck,
   Clock,
@@ -6,6 +6,7 @@ import {
   Activity,
   Plus,
   ArrowRight,
+  ChevronRight,
   User,
   CheckCircle2,
   Trash2,
@@ -354,14 +355,37 @@ function DashboardWidgetCard({
   );
 }
 
-export function ModernUserDashboard() {
+export function ModernUserDashboard({
+  onOpenReview,
+}: {
+  onOpenReview?: (articleId?: string) => void;
+} = {}) {
+  const { state } = useHmsStore();
   const [selectedCardId, setSelectedCardId] = useState<number>(0);
   const [addWidgetOpen, setAddWidgetOpen] = useState(false);
   const [widgetToDelete, setWidgetToDelete] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
-  const activeCard = CARDS.find((c) => c.id === selectedCardId) || CARDS[0];
+  const pendingArticles = useMemo(
+    () => state.articles.filter((a) => a.approvalStatus === "pending"),
+    [state.articles],
+  );
+
+  const dynamicCards = useMemo(
+    () => [
+      {
+        ...CARDS[0],
+        count: pendingArticles.length,
+      },
+      CARDS[1],
+      CARDS[2],
+      CARDS[3],
+    ],
+    [pendingArticles.length],
+  );
+
+  const activeCard = dynamicCards.find((c) => c.id === selectedCardId) || dynamicCards[0];
 
   // Category Persistence State (Starts completely empty for all cards)
   const [categoryWidgets, setCategoryWidgets] = useState<Record<WidgetCategory, UserWidgetState[]>>(() => {
@@ -533,29 +557,81 @@ export function ModernUserDashboard() {
     switch (widgetId) {
       case "help_approvals":
         return (
-          <div className="divide-y divide-slate-100 dark:divide-slate-800 flex-1 flex flex-col justify-around py-1 overflow-hidden">
-            {QUEUE_ITEMS.map((item) => (
-              <div
-                key={item.id}
-                className="py-2 flex items-center justify-between gap-4 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 px-2 rounded-xl transition-colors cursor-pointer"
-                onClick={() => toast.info(`Viewing details for ${item.title}`)}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-sky-500 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
-                    {item.avatar}
-                  </div>
-                  <span className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate">
-                    {item.title}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  {getStatusBadge(item.status)}
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium min-w-[50px] text-right">
-                    {item.timeLeft}
-                  </span>
-                </div>
+          <div className="flex-1 flex flex-col justify-between py-1 overflow-hidden">
+            {pendingArticles.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground flex flex-col items-center justify-center gap-2">
+                <CheckCircle2 className="size-8 text-emerald-500" />
+                <span className="font-semibold text-slate-700 dark:text-slate-200">
+                  All items reviewed
+                </span>
+                <span className="text-[11px]">There are no pending approvals in the queue.</span>
               </div>
-            ))}
+            ) : (
+              <div className="space-y-1 overflow-y-auto max-h-[260px] pr-1 divide-y divide-slate-100 dark:divide-slate-800">
+                {pendingArticles.slice(0, 5).map((item) => {
+                  const initials = (item.authorName || "HA")
+                    .split(" ")
+                    .map((w) => w[0])
+                    .slice(0, 2)
+                    .join("")
+                    .toUpperCase();
+                  const isFolder = item.contentType === "folder";
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="py-2.5 px-2 flex items-center justify-between gap-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/50 rounded-xl transition-colors cursor-pointer group"
+                      onClick={() => onOpenReview?.(item.id)}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div
+                          className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center shrink-0 shadow-xs ${
+                            isFolder
+                              ? "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
+                              : "bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300"
+                          }`}
+                        >
+                          {initials}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-blue-600 transition-colors">
+                            {item.title}
+                          </div>
+                          <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate flex items-center gap-1.5 mt-0.5">
+                            <span className="capitalize">{item.contentType}</span>
+                            <span>•</span>
+                            <span>by {item.authorName}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Badge
+                          variant="outline"
+                          className="bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 text-[10px] font-semibold"
+                        >
+                          Pending Review
+                        </Badge>
+                        <ChevronRight className="size-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {onOpenReview && (
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end shrink-0">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => onOpenReview()}
+                  className="text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/50 font-medium h-7 gap-1"
+                >
+                  <span>Open Review Queue</span>
+                  <ArrowRight className="size-3" />
+                </Button>
+              </div>
+            )}
           </div>
         );
 
@@ -753,7 +829,7 @@ export function ModernUserDashboard() {
 
       {/* Top 4 KPI Summary Stat Cards (Card Selectors) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
-        {CARDS.map((card) => {
+        {dynamicCards.map((card) => {
           const IconComponent = card.icon;
           const isSelected = selectedCardId === card.id;
 
@@ -782,6 +858,19 @@ export function ModernUserDashboard() {
               <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
                 {card.label}
               </span>
+              {card.id === 0 && onOpenReview && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenReview();
+                  }}
+                  className="text-[11px] text-sky-600 dark:text-sky-400 font-semibold hover:underline flex items-center gap-1 mt-0.5 cursor-pointer"
+                >
+                  <span>Review Queue</span>
+                  <ArrowRight className="size-3" />
+                </button>
+              )}
             </div>
           );
         })}

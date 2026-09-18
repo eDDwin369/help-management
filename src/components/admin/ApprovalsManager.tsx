@@ -38,6 +38,7 @@ import {
   FolderOpen,
   Image as ImageIcon,
   Layers,
+  ListFilter,
   MoreVertical,
   Pencil,
   Plus,
@@ -45,9 +46,17 @@ import {
   Video,
   X,
   Sparkles,
+  ArrowLeft,
+  Clock,
 } from "lucide-react";
 
-const TYPE_ICON = { video: Video, pdf: FileText, image: ImageIcon, text: FileText } as const;
+const TYPE_ICON = {
+  video: Video,
+  pdf: FileText,
+  image: ImageIcon,
+  text: FileText,
+  folder: Folder,
+} as const;
 
 interface TreeItem {
   article: HmsArticle;
@@ -71,7 +80,15 @@ interface PageGroup {
   items: TreeItem[];
 }
 
-export function ApprovalsManager({ canApprove = false }: { canApprove?: boolean }) {
+export function ApprovalsManager({
+  canApprove = false,
+  initialSelectedId = null,
+  onBack,
+}: {
+  canApprove?: boolean;
+  initialSelectedId?: string | null;
+  onBack?: () => void;
+}) {
   const { user } = useAuth();
   const {
     state,
@@ -86,7 +103,14 @@ export function ApprovalsManager({ canApprove = false }: { canApprove?: boolean 
   const [type, setType] = useState<"all" | HmsArticle["contentType"]>("all");
   const [approval, setApproval] = useState<"all" | "pending" | "approved" | "rejected">("pending");
   const [pageFilter, setPageFilter] = useState<string>("all");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
+  const [viewLayout, setViewLayout] = useState<"queue" | "hierarchy">("queue");
+
+  useEffect(() => {
+    if (initialSelectedId) {
+      setSelectedId(initialSelectedId);
+    }
+  }, [initialSelectedId]);
 
   // Expanded state for tree nodes
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
@@ -126,7 +150,12 @@ export function ApprovalsManager({ canApprove = false }: { canApprove?: boolean 
 
       if (approval === "approved" && a.approvalStatus !== "approved") return false;
       if (approval === "pending" && a.approvalStatus !== "pending") return false;
-      if (approval === "rejected" && a.approvalStatus !== "unapproved") return false;
+      if (
+        approval === "rejected" &&
+        a.approvalStatus !== "unapproved" &&
+        a.approvalStatus !== "rejected"
+      )
+        return false;
 
       if (pageFilter !== "all" && hierarchy.pageName !== pageFilter) return false;
 
@@ -255,15 +284,25 @@ export function ApprovalsManager({ canApprove = false }: { canApprove?: boolean 
       <div className="bg-card border rounded-2xl overflow-hidden shadow-sm shrink-0">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-5 pt-4 pb-1">
-          <div>
+          <div className="flex items-center gap-3">
+            {onBack && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1.5 rounded-xl text-xs font-medium border-border/80 hover:bg-muted"
+                onClick={onBack}
+              >
+                <ArrowLeft className="size-3.5" /> Back to Dashboard
+              </Button>
+            )}
             <div className="flex items-center gap-1.5 font-semibold text-base text-foreground">
-              <span>{user?.role === "sub_admin" ? "My Approvals" : "Approvals"}</span>
-              <InfoHint text="Review help articles structured by application UI hierarchy (Page → Menu → Card → Control)" />
+              <span>{user?.role === "sub_admin" ? "My Approvals" : "Approvals & Review"}</span>
+              <InfoHint text="Review help articles and folders. Superadmins can inspect previews, approve to make live, or reject with feedback." />
             </div>
           </div>
           <Button
             size="sm"
-            className="h-8 gap-1.5 bg-purple-600 hover:bg-purple-700 text-white font-medium"
+            className="h-8 gap-1.5 bg-purple-600 hover:bg-purple-700 text-white font-medium shadow-xs"
             onClick={() => requestPanelView({ type: "add" })}
           >
             <Plus className="size-3.5" /> Add help
@@ -274,7 +313,7 @@ export function ApprovalsManager({ canApprove = false }: { canApprove?: boolean 
         <SectionToolbar
           searchContext="admin-content-search"
           filterContext="admin-content-filter"
-          placeholder="Search approvals by page, card, or control..."
+          placeholder="Search approvals by title, author, folder, or page..."
           query={query}
           onQueryChange={setQuery}
           filterActive={filterActive}
@@ -286,7 +325,7 @@ export function ApprovalsManager({ canApprove = false }: { canApprove?: boolean 
                     {a === "all"
                       ? "All Statuses"
                       : a === "pending"
-                      ? "Pending Approval"
+                      ? "Pending Review"
                       : a === "approved"
                       ? "Approved"
                       : "Rejected"}
@@ -295,7 +334,7 @@ export function ApprovalsManager({ canApprove = false }: { canApprove?: boolean 
               </FilterGroup>
 
               <FilterGroup label="Content type">
-                {(["all", "video", "pdf", "image", "text"] as const).map((t) => (
+                {(["all", "folder", "video", "pdf", "image", "text"] as const).map((t) => (
                   <FilterChip key={t} active={type === t} onClick={() => setType(t)}>
                     {t === "all" ? "All Types" : t.toUpperCase()}
                   </FilterChip>
@@ -319,30 +358,267 @@ export function ApprovalsManager({ canApprove = false }: { canApprove?: boolean 
 
       {/* Main 2-Panel Experience */}
       <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3 overflow-hidden">
-        {/* LEFT PANEL: Hierarchical Report (~55% width on large screens) */}
+        {/* LEFT PANEL: Approvals Queue / Report (~58% width on large screens) */}
         <div className="lg:col-span-7 flex flex-col h-full min-h-0 bg-card border rounded-2xl overflow-hidden shadow-sm">
-          <div className="p-3.5 px-4 bg-muted/20 border-b flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          <div className="p-3.5 px-4 bg-muted/20 border-b flex items-center justify-between text-xs font-semibold text-muted-foreground">
             <div className="flex items-center gap-2">
-              <Layers className="size-4 text-purple-600 dark:text-purple-400" />
-              <span>UI Hierarchy Approval Report</span>
+              {viewLayout === "queue" ? (
+                <ListFilter className="size-4 text-purple-600 dark:text-purple-400" />
+              ) : (
+                <Layers className="size-4 text-purple-600 dark:text-purple-400" />
+              )}
+              <span className="font-semibold text-foreground text-xs uppercase tracking-wider">
+                {viewLayout === "queue" ? "Pending Approval Requests" : "UI Hierarchy Report"}
+              </span>
+              <Badge variant="secondary" className="text-[11px] font-normal ml-1">
+                {filteredArticles.length} item{filteredArticles.length === 1 ? "" : "s"}
+              </Badge>
             </div>
-            <span className="text-[11px] font-normal text-muted-foreground">
-              {filteredArticles.length} Help item{filteredArticles.length === 1 ? "" : "s"}
-            </span>
+
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 bg-muted/50 p-0.5 rounded-lg border border-border/50">
+              <button
+                type="button"
+                onClick={() => setViewLayout("queue")}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewLayout === "queue"
+                    ? "bg-card text-foreground shadow-xs font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <ListFilter className="size-3.5" />
+                <span>Queue View</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewLayout("hierarchy")}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
+                  viewLayout === "hierarchy"
+                    ? "bg-card text-foreground shadow-xs font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Layers className="size-3.5" />
+                <span>Hierarchy View</span>
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-x-auto overflow-y-auto">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-muted/40 text-muted-foreground uppercase tracking-wider text-[10px] border-b">
-                <tr>
-                  <th className="px-4 py-2.5 font-semibold">Hierarchy / Control & Title</th>
-                  <th className="px-3 py-2.5 font-semibold w-20">Type</th>
-                  <th className="px-3 py-2.5 font-semibold w-28">Status</th>
-                  <th className="px-3 py-2.5 font-semibold w-28">Author</th>
-                  <th className="px-3 py-2.5 font-semibold w-28 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
+            {viewLayout === "queue" ? (
+              /* Flat Queue View matching User Specification: Folder/Content Name, Submitted By, Date, Content Type, Pending Status */
+              <table className="w-full text-xs text-left">
+                <thead className="bg-muted/40 text-muted-foreground uppercase tracking-wider text-[10px] border-b sticky top-0 z-10 backdrop-blur-xs">
+                  <tr>
+                    <th className="px-4 py-2.5 font-semibold">Folder / Content Name</th>
+                    <th className="px-3 py-2.5 font-semibold w-24">Type</th>
+                    <th className="px-3 py-2.5 font-semibold w-28">Submitted By</th>
+                    <th className="px-3 py-2.5 font-semibold w-24">Date</th>
+                    <th className="px-3 py-2.5 font-semibold w-28">Status</th>
+                    <th className="px-3 py-2.5 font-semibold w-24 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {filteredArticles.length === 0 ? (
+                    <EmptyRow
+                      colSpan={6}
+                      message="No pending approval requests match the current search or filters."
+                    />
+                  ) : (
+                    filteredArticles.map((article) => {
+                      const isSelected = article.id === selectedId;
+                      const Icon = TYPE_ICON[article.contentType] || FileText;
+                      const hierarchy = getArticleHierarchy(article);
+                      const displayDate = article.updatedAt
+                        ? new Date(article.updatedAt).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })
+                        : "Recently";
+
+                      return (
+                        <tr
+                          key={article.id}
+                          className={`transition-colors cursor-pointer select-none ${
+                            isSelected
+                              ? "bg-purple-500/10 dark:bg-purple-500/20 border-l-4 border-l-purple-600 font-medium"
+                              : "hover:bg-muted/30"
+                          }`}
+                          onClick={() => setSelectedId(article.id)}
+                          onDoubleClick={() => setFullscreenArticle(article)}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            setSelectedId(article.id);
+                            setContextMenu({
+                              x: e.clientX,
+                              y: e.clientY,
+                              article,
+                            });
+                          }}
+                        >
+                          {/* Column 1: Folder / Content Name */}
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div
+                                className={`size-7 rounded-lg flex items-center justify-center shrink-0 ${
+                                  article.contentType === "folder"
+                                    ? "bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400"
+                                    : article.contentType === "video"
+                                    ? "bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400"
+                                    : article.contentType === "pdf"
+                                    ? "bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400"
+                                    : article.contentType === "image"
+                                    ? "bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400"
+                                    : "bg-purple-100 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400"
+                                }`}
+                              >
+                                <Icon className="size-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-semibold text-foreground truncate max-w-[200px]">
+                                  {article.title}
+                                </div>
+                                <div className="text-[11px] text-muted-foreground truncate max-w-[200px]">
+                                  {hierarchy.pageName} › {hierarchy.cardName}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Column 2: Content Type */}
+                          <td className="px-3 py-2.5 whitespace-nowrap">
+                            <Badge variant="outline" className="gap-1 text-[10px] font-normal capitalize">
+                              <Icon className="size-3" />
+                              {article.contentType}
+                            </Badge>
+                          </td>
+
+                          {/* Column 3: Submitted By */}
+                          <td className="px-3 py-2.5 whitespace-nowrap">
+                            <span className="text-muted-foreground truncate block max-w-[110px]">
+                              {article.authorName}
+                            </span>
+                          </td>
+
+                          {/* Column 4: Date */}
+                          <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground text-[11px]">
+                            {displayDate}
+                          </td>
+
+                          {/* Column 5: Status */}
+                          <td className="px-3 py-2.5 whitespace-nowrap">
+                            <Badge
+                              className={`text-[10px] font-normal px-2 py-0.5 ${
+                                article.archiveStatus === "archived"
+                                  ? "bg-muted text-muted-foreground"
+                                  : article.approvalStatus === "approved"
+                                  ? "bg-emerald-500/15 text-emerald-600 hover:bg-emerald-500/15"
+                                  : article.approvalStatus === "unapproved" ||
+                                    article.approvalStatus === "rejected"
+                                  ? "bg-rose-500/15 text-rose-600 hover:bg-rose-500/15"
+                                  : "bg-amber-500/15 text-amber-600 hover:bg-amber-500/15"
+                              }`}
+                            >
+                              {article.archiveStatus === "archived"
+                                ? "Archived"
+                                : article.approvalStatus === "approved"
+                                ? "Approved"
+                                : article.approvalStatus === "unapproved" ||
+                                  article.approvalStatus === "rejected"
+                                ? "Rejected"
+                                : "Pending Review"}
+                            </Badge>
+                          </td>
+
+                          {/* Column 6: Actions */}
+                          <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1">
+                              {canApprove && (
+                                <>
+                                  {article.approvalStatus !== "approved" && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-7 px-2 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 gap-1"
+                                      title="Approve help entry"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleApprove(article.id);
+                                      }}
+                                    >
+                                      <Check className="size-3" /> Approve
+                                    </Button>
+                                  )}
+
+                                  {article.approvalStatus !== "unapproved" &&
+                                    article.approvalStatus !== "rejected" && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-7 px-2 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 gap-1"
+                                        title="Reject help entry"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setRejectingArticle(article);
+                                        }}
+                                      >
+                                        <X className="size-3" /> Reject
+                                      </Button>
+                                    )}
+                                </>
+                              )}
+
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="size-7"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <MoreVertical className="size-3.5" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-44 text-xs">
+                                  <DropdownMenuItem onClick={() => setSelectedId(article.id)}>
+                                    <Eye className="size-3.5 mr-2" /> View Preview
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => setFullscreenArticle(article)}>
+                                    <Sparkles className="size-3.5 mr-2 text-purple-500" /> Full Screen
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleCopyLink(article)}>
+                                    <Copy className="size-3.5 mr-2" /> Copy Hierarchy Link
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      requestPanelView({ type: "add", editId: article.id })
+                                    }
+                                  >
+                                    <Pencil className="size-3.5 mr-2" /> Edit Entry
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              /* Tree Hierarchy Report */
+              <table className="w-full text-xs text-left">
+                <thead className="bg-muted/40 text-muted-foreground uppercase tracking-wider text-[10px] border-b">
+                  <tr>
+                    <th className="px-4 py-2.5 font-semibold">Hierarchy / Control & Title</th>
+                    <th className="px-3 py-2.5 font-semibold w-20">Type</th>
+                    <th className="px-3 py-2.5 font-semibold w-28">Status</th>
+                    <th className="px-3 py-2.5 font-semibold w-28">Author</th>
+                    <th className="px-3 py-2.5 font-semibold w-28 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
                 {hierarchyGroups.length === 0 ? (
                   <EmptyRow colSpan={5} message="No help items match the current search or filters." />
                 ) : (
@@ -647,8 +923,9 @@ export function ApprovalsManager({ canApprove = false }: { canApprove?: boolean 
                 )}
               </tbody>
             </table>
-          </div>
+          )}
         </div>
+      </div>
 
         {/* RIGHT PANEL: Interactive Snapshot & Media Viewer (~48% width) */}
         <div className="lg:col-span-5 flex flex-col h-full min-h-0 overflow-hidden">

@@ -12,9 +12,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { AlertTriangle, X } from "lucide-react";
 
 const REASON_PRESETS = [
+  "Outdated specifications",
+  "Media resolution below standard",
+  "Incorrect control mapping",
   "Poor recording quality",
-  "Incorrect information",
-  "Missing information",
+  "Missing documentation",
   "Does not follow guidelines",
 ];
 

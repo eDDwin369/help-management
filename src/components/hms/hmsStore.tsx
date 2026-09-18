@@ -19,12 +19,32 @@ import {
 } from "@/lib/hms-context-registry";
 import { ARTICLE_MEDIA, bodyForArticle, type ArticleSection } from "@/lib/help-content";
 
-export type ContentType = "video" | "pdf" | "image" | "text";
-export type ApprovalStatus = "approved" | "pending" | "unapproved";
+export type ContentType = "video" | "pdf" | "image" | "text" | "folder";
+export type ApprovalStatus = "approved" | "pending" | "unapproved" | "rejected";
 export type ArchiveStatus = "active" | "archived";
 export type TicketStatus = "pending" | "under-review" | "resolved" | "closed";
 export type Priority = "low" | "medium" | "high" | "urgent";
 export type UserRole = "customer" | "help-admin" | "admin";
+
+export function isApproved(status?: string): boolean {
+  return status === "approved";
+}
+
+export function isPending(status?: string): boolean {
+  return status === "pending";
+}
+
+export function isRejected(status?: string): boolean {
+  return status === "unapproved" || status === "rejected";
+}
+
+export interface FolderChildItem {
+  id: string;
+  name: string;
+  type: ContentType;
+  size?: string;
+  approvalStatus?: ApprovalStatus;
+}
 
 export interface HmsAttachment {
   name: string;
@@ -69,6 +89,7 @@ export interface HmsArticle {
   priority: Priority;
   sizeBytes?: number;
   pages?: number;
+  folderChildren?: FolderChildItem[];
 }
 
 /** Helper to derive or retrieve structured 4-level hierarchy for an article. */
@@ -557,6 +578,108 @@ const SEED_ARTICLES: HmsArticle[] = [
     priority: "medium",
     sizeBytes: 540_000,
   }),
+  article({
+    id: "folder-001",
+    title: "Site Patrol Onboarding & Checklists",
+    description: "Standard operating procedures, emergency drone patrol protocols, and technician check-in checklists.",
+    contentType: "folder",
+    contentUrl: null,
+    contexts: ["app-tab-site-patrol", "section-site-patrol"],
+    approvalStatus: "pending",
+    archiveStatus: "active",
+    authorId: "sub_admin",
+    authorName: "Sam HelpAdmin",
+    approvedBy: null,
+    approvedAt: null,
+    createdAt: "2026-09-18T14:30:00Z",
+    updatedAt: "2026-09-18T14:30:00Z",
+    tags: ["folder", "site-patrol", "onboarding"],
+    priority: "high",
+    folderChildren: [
+      { id: "fc-1", name: "Drone Pre-Flight Safety Checklist.pdf", type: "pdf", size: "1.4 MB", approvalStatus: "pending" },
+      { id: "fc-2", name: "Technician Patrol Protocol Video.mp4", type: "video", size: "8.2 MB", approvalStatus: "pending" },
+      { id: "fc-3", name: "Emergency Contact Matrix.pdf", type: "pdf", size: "420 KB", approvalStatus: "approved" },
+    ],
+  }),
+  article({
+    id: "art-027",
+    title: "Level 2 Drone Patrol Video Demonstration",
+    description: "Inspection flight path walkthrough and live obstacle avoidance sensor calibration.",
+    contentType: "video",
+    contentUrl: "/images/drawing-videos.png",
+    contexts: ["section-drawing-videos", "drawing-videos-player"],
+    approvalStatus: "pending",
+    archiveStatus: "active",
+    authorId: "sub_admin",
+    authorName: "Alex HelpAdmin",
+    approvedBy: null,
+    approvedAt: null,
+    createdAt: "2026-09-18T16:15:00Z",
+    updatedAt: "2026-09-18T16:15:00Z",
+    tags: ["video", "drone", "inspection"],
+    priority: "high",
+    sizeBytes: 14_200_000,
+  }),
+  article({
+    id: "art-028",
+    title: "Safety Equipment & Sensor Specs Sheet",
+    description: "Comprehensive sensor sensitivity specifications, operating temperatures, and battery guidelines.",
+    contentType: "pdf",
+    contentUrl: null,
+    contexts: ["site-recordings-table", "site-recordings-breadcrumb"],
+    approvalStatus: "pending",
+    archiveStatus: "active",
+    authorId: "sub_admin",
+    authorName: "Sam HelpAdmin",
+    approvedBy: null,
+    approvedAt: null,
+    createdAt: "2026-09-18T17:40:00Z",
+    updatedAt: "2026-09-18T17:40:00Z",
+    tags: ["safety", "specs", "pdf"],
+    priority: "medium",
+    pages: 4,
+    sizeBytes: 3_800_000,
+  }),
+  article({
+    id: "art-029",
+    title: "360 Spatial Zone Layout & Camera Grid",
+    description: "Floor plan diagram overlaying all 14 fixed HD cameras and motion sensor tripwires.",
+    contentType: "image",
+    contentUrl: "/images/site-recordings.png",
+    contexts: ["site-recordings-table", "site-recordings-col-pin"],
+    approvalStatus: "pending",
+    archiveStatus: "active",
+    authorId: "sub_admin",
+    authorName: "Elena HelpAdmin",
+    approvedBy: null,
+    approvedAt: null,
+    createdAt: "2026-09-18T18:05:00Z",
+    updatedAt: "2026-09-18T18:05:00Z",
+    tags: ["diagram", "360", "cameras"],
+    priority: "low",
+    sizeBytes: 1_250_000,
+  }),
+  article({
+    id: "art-030",
+    title: "Legacy Camera Configuration v1",
+    description: "Legacy analog configuration document for previous generation camera hubs.",
+    contentType: "pdf",
+    contentUrl: null,
+    contexts: ["site-recordings-table"],
+    approvalStatus: "unapproved",
+    archiveStatus: "active",
+    authorId: "sub_admin",
+    authorName: "Sam HelpAdmin",
+    approvedBy: null,
+    approvedAt: null,
+    rejectionReason: "Legacy specifications are deprecated. Please update to 1920x960 HD camera standards.",
+    rejectedBy: "Jordan Admin (Superadmin)",
+    rejectedAt: "2026-09-18T11:20:00Z",
+    createdAt: "2026-09-17T09:00:00Z",
+    updatedAt: "2026-09-18T11:20:00Z",
+    tags: ["deprecated", "camera"],
+    priority: "low",
+  }),
 ];
 
 const SEED_TICKETS: HmsTicket[] = [
@@ -613,7 +736,7 @@ const DEFAULT_STATE: HmsState = {
   notifications: { customer: 0, helpAdmin: 0, admin: 0 },
 };
 
-const STORAGE_KEY = "hmsStore.v4";
+const STORAGE_KEY = "hmsStore.v5";
 
 function loadPersistedState(): HmsState {
   if (typeof window === "undefined") return DEFAULT_STATE;

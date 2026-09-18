@@ -45,6 +45,8 @@ import {
   Home,
   Clock,
   CheckCircle2,
+  XCircle,
+  AlertTriangle,
 } from "lucide-react";
 import {
   Tooltip,
@@ -63,7 +65,8 @@ export interface HelpAdminNode {
   modified: string;
   contentUrl?: string;
   description?: string;
-  approvalStatus: "draft" | "pending" | "approved";
+  approvalStatus: "draft" | "pending" | "approved" | "rejected" | "unapproved";
+  rejectionReason?: string;
   children?: HelpAdminNode[];
 }
 
@@ -231,6 +234,56 @@ export function HelpAdminRightClickModal() {
   const [search, setSearch] = useState("");
 
   const [nodes, setNodes] = useState<HelpAdminNode[]>(() => loadSavedNodes());
+
+  // Real-time synchronization of nodes with hmsStore articles (approval/rejection status & reasons)
+  useEffect(() => {
+    setNodes((prev) => {
+      let hasChanges = false;
+      const syncList = (list: HelpAdminNode[]): HelpAdminNode[] => {
+        return list.map((node) => {
+          const matchedArticle = hmsState.articles.find(
+            (a) =>
+              a.id === node.id ||
+              a.id === `art-${node.id}` ||
+              a.id === `folder-${node.id}` ||
+              a.title.toLowerCase() === node.name.toLowerCase(),
+          );
+
+          let updatedNode = node;
+          if (matchedArticle) {
+            const currentStatus =
+              matchedArticle.approvalStatus === "unapproved"
+                ? "rejected"
+                : matchedArticle.approvalStatus;
+            if (
+              node.approvalStatus !== currentStatus ||
+              (matchedArticle.rejectionReason &&
+                node.rejectionReason !== matchedArticle.rejectionReason)
+            ) {
+              hasChanges = true;
+              updatedNode = {
+                ...node,
+                approvalStatus: currentStatus as any,
+                rejectionReason: matchedArticle.rejectionReason || node.rejectionReason,
+              };
+            }
+          }
+
+          if (updatedNode.children && updatedNode.children.length > 0) {
+            const syncedChildren = syncList(updatedNode.children);
+            if (syncedChildren !== updatedNode.children) {
+              updatedNode = { ...updatedNode, children: syncedChildren };
+            }
+          }
+
+          return updatedNode;
+        });
+      };
+
+      const result = syncList(prev);
+      return hasChanges ? result : prev;
+    });
+  }, [hmsState.articles]);
 
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
@@ -881,17 +934,43 @@ export function HelpAdminRightClickModal() {
     e.preventDefault();
     if (!itemName.trim()) return;
 
+    const isSuperadmin = user?.role === "admin";
+    const initialStatus = isSuperadmin ? "approved" : "pending";
+
     const newNode: HelpAdminNode = {
       id: `node-${Date.now()}`,
       name: itemName.trim(),
       kind: targetParentId ? "subfolder" : "folder",
       parentId: targetParentId,
-      owner: user?.name || "Help Admin",
+      owner: user?.name || (isSuperadmin ? "Superadmin" : "Help Admin"),
       modified: "Just now",
       description: itemDescription.trim(),
-      approvalStatus: "draft",
+      approvalStatus: initialStatus,
       children: [],
     };
+
+    const meta = getArticleContextAndHierarchy(newNode, context, contextKey, nodes);
+
+    addArticle({
+      id: `folder-${newNode.id}`,
+      title: newNode.name,
+      description: newNode.description || `Folder created by ${newNode.owner} for ${meta.pageName}`,
+      contentType: "folder",
+      contentUrl: null,
+      relatedContext: meta.relatedContext,
+      contexts: [meta.contextKey],
+      hierarchy: meta.hierarchy,
+      approvalStatus: initialStatus,
+      archiveStatus: "active",
+      authorId: user?.id || (isSuperadmin ? "admin" : "sub_admin"),
+      authorName: newNode.owner,
+      approvedBy: isSuperadmin ? user?.name || "Jordan Admin" : null,
+      approvedAt: isSuperadmin ? new Date().toISOString() : null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      tags: ["folder", "help-admin"],
+      priority: "medium",
+    });
 
     if (!targetParentId) {
       // Root level node
@@ -919,7 +998,11 @@ export function HelpAdminRightClickModal() {
       setExpandedIds((prev) => new Set(prev).add(targetParentId));
     }
 
-    toast.success(`Created folder "${newNode.name}"`);
+    toast.success(
+      isSuperadmin
+        ? `Created folder "${newNode.name}" (Approved)`
+        : `Created folder "${newNode.name}" — Submitted to Superadmin for review`
+    );
     setItemName("");
     setItemDescription("");
     setAddDialogOpen(false);
@@ -1740,20 +1823,39 @@ export function HelpAdminRightClickModal() {
                 </DialogTitle>
                 <Badge
                   variant="outline"
-                  className={`text-[10px] capitalize ${
+                  className={`text-[10px] capitalize font-medium ${
                     previewNode.approvalStatus === "approved"
                       ? "bg-emerald-50 text-emerald-600 border-emerald-300"
                       : previewNode.approvalStatus === "pending"
                       ? "bg-amber-50 text-amber-600 border-amber-300"
+                      : previewNode.approvalStatus === "rejected" ||
+                        previewNode.approvalStatus === "unapproved"
+                      ? "bg-rose-50 text-rose-600 border-rose-300"
                       : "bg-slate-100 text-slate-600 border-slate-300"
                   }`}
                 >
-                  {previewNode.approvalStatus}
+                  {previewNode.approvalStatus === "unapproved" ? "rejected" : previewNode.approvalStatus}
                 </Badge>
               </div>
               <DialogDescription className="text-xs text-muted-foreground mt-0.5">
                 Added by {previewNode.owner} • {previewNode.modified}
               </DialogDescription>
+
+              {(previewNode.approvalStatus === "rejected" ||
+                previewNode.approvalStatus === "unapproved") && (
+                <div className="mt-2.5 p-2.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/80 dark:bg-rose-950/40 text-xs text-rose-800 dark:text-rose-200 flex items-start gap-2 text-left">
+                  <AlertTriangle className="size-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <div className="font-semibold text-rose-900 dark:text-rose-100">
+                      Superadmin Rejection Feedback:
+                    </div>
+                    <div className="text-[11px] text-rose-700 dark:text-rose-300 mt-0.5 leading-relaxed">
+                      {previewNode.rejectionReason ||
+                        "Item was rejected by Superadmin. Please revise the content or media and resubmit for approval."}
+                    </div>
+                  </div>
+                </div>
+              )}
             </DialogHeader>
 
             {/* Interactive Viewport Area with Zoom & Pan handlers */}
@@ -1987,6 +2089,17 @@ function TreeNodeItem({
             <Badge variant="outline" className="h-4 px-1 text-[9px] bg-emerald-50 text-emerald-600 border-emerald-300">
               <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" /> Approved
             </Badge>
+          ) : node.approvalStatus === "rejected" || node.approvalStatus === "unapproved" ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className="h-4 px-1 text-[9px] bg-rose-50 text-rose-600 border-rose-300 cursor-help">
+                  <XCircle className="h-2.5 w-2.5 mr-0.5" /> Rejected
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs bg-slate-900 text-white font-medium max-w-[240px]">
+                {node.rejectionReason ? `Reason: ${node.rejectionReason}` : "Rejected by Superadmin"}
+              </TooltipContent>
+            </Tooltip>
           ) : (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -2002,7 +2115,7 @@ function TreeNodeItem({
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top" className="text-xs bg-slate-900 text-white font-semibold">
-                Approve
+                Send for Approval
               </TooltipContent>
             </Tooltip>
           )}
@@ -2146,13 +2259,30 @@ function GridNodeItem({
           </p>
         </div>
 
-        <div className="flex items-center justify-center gap-1.5 pt-0.5 border-t border-slate-100 dark:border-border/30">
-          <div className="h-3.5 w-3.5 rounded-full bg-blue-700 text-white font-bold text-[8px] flex items-center justify-center shrink-0">
-            A
+        <div className="flex items-center justify-between gap-1.5 pt-0.5 border-t border-slate-100 dark:border-border/30 px-1">
+          <div className="flex items-center gap-1 min-w-0">
+            <div className="h-3.5 w-3.5 rounded-full bg-blue-700 text-white font-bold text-[8px] flex items-center justify-center shrink-0">
+              {node.owner.slice(0, 1).toUpperCase()}
+            </div>
+            <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate max-w-[80px]">
+              {node.owner}
+            </span>
           </div>
-          <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 truncate max-w-[100px]">
-            {node.owner}
-          </span>
+
+          <Badge
+            variant="outline"
+            className={`text-[8px] h-3.5 px-1 font-medium capitalize shrink-0 ${
+              node.approvalStatus === "approved"
+                ? "bg-emerald-50 text-emerald-600 border-emerald-300"
+                : node.approvalStatus === "pending"
+                ? "bg-amber-50 text-amber-600 border-amber-300"
+                : node.approvalStatus === "rejected" || node.approvalStatus === "unapproved"
+                ? "bg-rose-50 text-rose-600 border-rose-300"
+                : "bg-slate-100 text-slate-600 border-slate-300"
+            }`}
+          >
+            {node.approvalStatus === "unapproved" ? "rejected" : node.approvalStatus}
+          </Badge>
         </div>
       </div>
     </div>
