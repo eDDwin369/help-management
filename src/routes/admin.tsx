@@ -129,76 +129,7 @@ function AdminPage() {
       <div className="p-6 max-w-[1600px] mx-auto relative h-full flex flex-col min-h-0 overflow-hidden space-y-3">
         <h1 className="sr-only">Help Administration</h1>
 
-        {/* Top Tab Bar: Dashboard, For Review, Coverage, Analytics */}
-        <div className="flex items-center justify-between shrink-0 bg-white dark:bg-slate-900 border rounded-2xl p-1.5 shadow-xs">
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setTab("overview")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-2 cursor-pointer ${
-                tab === "overview"
-                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold shadow-xs"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-              }`}
-            >
-              <LayoutDashboard className="size-4 text-blue-600 dark:text-blue-400" />
-              <span>Dashboard</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedReviewId(null);
-                setTab("content");
-              }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-2 cursor-pointer ${
-                tab === "content"
-                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold shadow-xs"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-              }`}
-            >
-              <ClipboardCheck className="size-4 text-purple-600 dark:text-purple-400" />
-              <span>For Review</span>
-              {pendingCount > 0 && (
-                <Badge className="h-5 px-1.5 text-[10px] font-bold bg-amber-500 hover:bg-amber-500 text-white rounded-full">
-                  {pendingCount}
-                </Badge>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setTab("coverage")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-2 cursor-pointer ${
-                tab === "coverage"
-                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold shadow-xs"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-              }`}
-            >
-              <LifeBuoy className="size-4 text-emerald-600 dark:text-emerald-400" />
-              <span>Coverage</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setTab("usage")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-2 cursor-pointer ${
-                tab === "usage"
-                  ? "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white font-semibold shadow-xs"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-              }`}
-            >
-              <BarChart3 className="size-4 text-sky-600 dark:text-sky-400" />
-              <span>Analytics</span>
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2 pr-2">
-            <Badge variant="outline" className="text-[11px] font-normal text-slate-500">
-              Role: <span className="font-semibold text-foreground ml-1 uppercase">{user.role}</span>
-            </Badge>
-          </div>
-        </div>
+        
 
         <div className="flex-1 min-h-0 overflow-hidden">
           {tab === "overview" && (
