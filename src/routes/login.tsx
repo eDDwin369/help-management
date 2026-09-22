@@ -109,31 +109,12 @@ function LoginPage() {
   return (
     <div className="h-screen overflow-y-auto grid lg:grid-cols-2 bg-background">
       {/* Brand panel */}
-      <div className="hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-white relative overflow-hidden">
-        <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_30%_20%,rgba(99,102,241,0.4),transparent_60%),radial-gradient(circle_at_70%_80%,rgba(244,114,182,0.3),transparent_60%)]" />
-        <div className="relative">
-          <div className="flex items-center gap-2 text-lg font-semibold">
-            <div className="size-9 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center">
-              <Sparkles className="size-5" />
-            </div>
-            OomniEye
-          </div>
-        </div>
-        <div className="relative max-w-md">
-          <div className="text-xs uppercase tracking-widest text-white/60 mb-3">
-            Enterprise Help Platform
-          </div>
-          <h1 className="text-4xl font-semibold leading-tight">
-            Contextual help, ticketing & content management — built for Fortune-500 teams.
-          </h1>
-          <p className="text-white/70 mt-4 leading-relaxed">
-            Right-click any action button to get instant help, ask support, or browse FAQs — without
-            ever leaving the screen.
-          </p>
-        </div>
-        <div className="relative text-xs text-white/50">
-          © 2026 OomniEye · Digital Twin Solutions
-        </div>
+      <div className="hidden lg:flex items-center justify-center relative w-full h-full bg-black border-r border-border/40 overflow-hidden p-6 lg:p-8 xl:p-10">
+        <img
+          src="/images/live-digital-twin.png"
+          alt="Live Digital Twin"
+          className="w-full h-full object-contain select-none"
+        />
       </div>
 
       {/* Form */}
