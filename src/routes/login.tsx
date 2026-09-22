@@ -13,10 +13,16 @@ import { ensureDemoAccount } from "@/lib/demo-auth.functions";
 
 
 
-type AppRedirect = "/dashboard" | "/tickets" | "/admin";
+type AppRedirect = "/dashboard" | "/tickets" | "/admin" | "/customer" | "/user";
 
 function normalizeRedirect(value: unknown): AppRedirect {
-  return value === "/tickets" || value === "/dashboard" ? value : "/dashboard";
+  return value === "/tickets" ||
+    value === "/dashboard" ||
+    value === "/admin" ||
+    value === "/customer" ||
+    value === "/user"
+    ? value
+    : "/dashboard";
 }
 
 const LOGIN_URL = "https://help-management-flows.lovable.app/login";

@@ -140,6 +140,7 @@ function AdminPage() {
               }}
             />
           )}
+
           {tab === "content" && (
             <ApprovalsManager
               canApprove={user?.role === "admin"}
@@ -147,6 +148,7 @@ function AdminPage() {
               onBack={() => setTab("overview")}
             />
           )}
+
           {tab === "coverage" && <CoverageTab />}
           {tab === "usage" && <UsageTab />}
         </div>

@@ -10,7 +10,8 @@ import {
   Pin,
   Ticket,
   ShieldCheck,
-  Users
+  Users,
+  UserCheck
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import '@/components/dashboard/Dashboard.css';
@@ -211,11 +212,25 @@ export function AppSidebar({
             )}
           </a>
 
+          {/* Customer Tab (Only visible to Customer role; never for Help Admin or Superadmin) */}
+          {user?.role === 'customer' && (
+            <a
+              href="#"
+              className={`nav-item ${path.startsWith('/customer') ? 'active' : ''}`}
+              onClick={(e) => { e.preventDefault(); handleNav('/customer'); }}
+              onMouseEnter={(e) => handleItemMouseEnter("Customer", e)}
+              onMouseLeave={handleItemMouseLeave}
+            >
+              <UserCheck size={20} className="nav-icon" color="#06b6d4" />
+              {isExpanded && <span className="nav-label">Customer</span>}
+            </a>
+          )}
+
           {/* User Tab */}
           <a
             href="#"
-            className={`nav-item ${path.startsWith('/admin') ? 'active' : ''}`}
-            onClick={(e) => { e.preventDefault(); handleNav('/admin'); }}
+            className={`nav-item ${path.startsWith('/user') ? 'active' : ''}`}
+            onClick={(e) => { e.preventDefault(); handleNav('/user'); }}
             onMouseEnter={(e) => handleItemMouseEnter("User", e)}
             onMouseLeave={handleItemMouseLeave}
           >
