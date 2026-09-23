@@ -55,54 +55,20 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-export interface HelpAdminNode {
-  id: string;
-  name: string;
-  kind: "folder" | "subfolder" | "pdf" | "video" | "image" | "text";
-  parentId?: string | null;
-  owner: string;
-  size?: string;
-  modified: string;
-  contentUrl?: string;
-  description?: string;
-  approvalStatus: "draft" | "pending" | "approved" | "rejected" | "unapproved";
-  rejectionReason?: string;
-  children?: HelpAdminNode[];
-}
+import { labelForContext } from "@/lib/hms-context-registry";
+import {
+  type HelpAdminNode,
+  loadSavedNodes,
+  DEFAULT_STARTER_NODES,
+  getSectionFromContext,
+  matchesNodeSection,
+  LOCAL_STORAGE_NODES_KEY,
+  SAMPLE_MEDIA,
+  deduplicateNodes,
+  repairNodeContent,
+} from "@/lib/help-nodes";
 
-// Default media previews for newly created items
-const SAMPLE_MEDIA: Record<string, string> = {
-  pdf: "/help/site-recordings-table-guide.pdf",
-  image: "/help/pin-location-map.jpg",
-  video: "/help/my-drawings-tour.mp4",
-  text: "This document contains step-by-step instructions for managing drawings and site plans in HMS.",
-};
-
-const LOCAL_STORAGE_NODES_KEY = "hms_help_admin_nodes_v2";
-
-function deduplicateNodes(list: HelpAdminNode[]): HelpAdminNode[] {
-  const seenIds = new Set<string>();
-  const cleanList: HelpAdminNode[] = [];
-
-  for (const node of list) {
-    if (seenIds.has(node.id)) continue;
-    seenIds.add(node.id);
-
-    if (node.children && node.children.length > 0) {
-      cleanList.push({
-        ...node,
-        children: deduplicateNodes(node.children),
-      });
-    } else {
-      cleanList.push({
-        ...node,
-        children: node.children ? [] : undefined,
-      });
-    }
-  }
-
-  return cleanList;
-}
+export type { HelpAdminNode };
 
 function compressImageFile(file: File, maxWidth = 1200, maxHeight = 1200, quality = 0.82): Promise<string> {
   return new Promise((resolve) => {
@@ -143,63 +109,13 @@ function compressImageFile(file: File, maxWidth = 1200, maxHeight = 1200, qualit
   });
 }
 
-function repairNodeContent(node: HelpAdminNode): HelpAdminNode {
-  let contentUrl = node.contentUrl;
-  if (node.kind === "image") {
-    if (
-      !contentUrl ||
-      (contentUrl.startsWith("data:") && (contentUrl.length <= 600 || !contentUrl.includes(";base64,")))
-    ) {
-      contentUrl = SAMPLE_MEDIA.image;
-    }
-  } else if (node.kind === "video") {
-    if (!contentUrl || (contentUrl.startsWith("data:") && contentUrl.length <= 600)) {
-      contentUrl = SAMPLE_MEDIA.video;
-    }
-  } else if (node.kind === "pdf") {
-    if (!contentUrl || (contentUrl.startsWith("data:") && contentUrl.length <= 600)) {
-      contentUrl = SAMPLE_MEDIA.pdf;
-    }
-  }
-  const updated = { ...node, contentUrl };
-  if (updated.children && updated.children.length > 0) {
-    updated.children = updated.children.map(repairNodeContent);
-  }
-  return updated;
-}
-
-import { DEFAULT_STARTER_NODES } from "@/lib/help-nodes";
-
-function loadSavedNodes(): HelpAdminNode[] {
-  if (typeof window === "undefined") return DEFAULT_STARTER_NODES;
-  try {
-    const saved = localStorage.getItem(LOCAL_STORAGE_NODES_KEY);
-    if (!saved) {
-      localStorage.setItem(LOCAL_STORAGE_NODES_KEY, JSON.stringify(DEFAULT_STARTER_NODES));
-      return DEFAULT_STARTER_NODES;
-    }
-    const parsed: HelpAdminNode[] = JSON.parse(saved);
-    if (!parsed || parsed.length === 0) {
-      localStorage.setItem(LOCAL_STORAGE_NODES_KEY, JSON.stringify(DEFAULT_STARTER_NODES));
-      return DEFAULT_STARTER_NODES;
-    }
-    const hasTestFlow = parsed.some((n) => n.name.toLowerCase() === "test flow");
-    let combined = parsed;
-    if (!hasTestFlow) {
-      combined = [...DEFAULT_STARTER_NODES, ...parsed];
-    }
-    return deduplicateNodes(combined.map(repairNodeContent));
-  } catch (e) {
-    console.error("Failed to load saved help admin nodes:", e);
-    return DEFAULT_STARTER_NODES;
-  }
-}
-
 function getArticleContextAndHierarchy(
   node: HelpAdminNode,
   context: string,
   contextKey: string,
-  nodesList: HelpAdminNode[]
+  nodesList: HelpAdminNode[],
+  sectionLabel?: string,
+  sectionKey?: string
 ) {
   let parentFolderName = "";
   if (node.parentId) {
@@ -216,20 +132,23 @@ function getArticleContextAndHierarchy(
     parentFolderName = findParent(nodesList) || "";
   }
 
-  let pageName = "Site Recordings";
-  if (context && context !== "Workspace") {
-    pageName = context.split(" › ")[0].trim() || "Site Recordings";
-  }
-
+  const pageName =
+    node.section ||
+    sectionLabel ||
+    (context && context !== "Workspace" ? context.split(" › ")[0].trim() : "Site Recordings");
   const cardName = parentFolderName || "Drawings";
   const controlName = node.name;
+  const ctxKey =
+    node.sectionKey ||
+    sectionKey ||
+    (contextKey && contextKey !== "workspace" ? contextKey : "site-recordings-table");
 
   return {
     pageName,
     cardName,
     controlName,
     relatedContext: `${pageName} › ${cardName} › ${controlName}`,
-    contextKey: contextKey && contextKey !== "workspace" ? contextKey : "site-recordings-table",
+    contextKey: ctxKey,
     hierarchy: {
       pageName,
       cardName,
@@ -240,7 +159,7 @@ function getArticleContextAndHierarchy(
 
 export function HelpAdminRightClickModal() {
   const { user } = useAuth();
-  const { state: hmsState, context, contextKey, addArticle, openPanel } = useHmsStore();
+  const { state: hmsState, context, contextKey, addArticle, updateArticle, openPanel, setContext } = useHmsStore();
 
   const isHelpAdmin = user?.role === "sub_admin" || user?.role === "admin";
 
@@ -249,6 +168,29 @@ export function HelpAdminRightClickModal() {
   const [search, setSearch] = useState("");
 
   const [nodes, setNodes] = useState<HelpAdminNode[]>(() => loadSavedNodes());
+
+  // Active section tracking (Per-section folder and content hierarchy)
+  const [activeSection, setActiveSection] = useState<{ sectionKey: string; sectionLabel: string }>(
+    () => getSectionFromContext(contextKey, context)
+  );
+
+  // Sync activeSection whenever context or contextKey changes externally
+  useEffect(() => {
+    const resolved = getSectionFromContext(contextKey, context);
+    setActiveSection((prev) => {
+      if (prev.sectionKey === resolved.sectionKey && prev.sectionLabel === resolved.sectionLabel) {
+        return prev;
+      }
+      return resolved;
+    });
+  }, [contextKey, context]);
+
+  // Section-specific root nodes: each section maintains its own separate folders and content hierarchy
+  const sectionNodes = useMemo(() => {
+    return nodes.filter((node) =>
+      matchesNodeSection(node, activeSection.sectionKey, activeSection.sectionLabel)
+    );
+  }, [nodes, activeSection]);
 
   // Real-time synchronization of nodes with hmsStore articles (approval/rejection status & reasons)
   useEffect(() => {
@@ -282,6 +224,20 @@ export function HelpAdminRightClickModal() {
                 rejectionReason: matchedArticle.rejectionReason || node.rejectionReason,
               };
             }
+
+            // Sync section metadata if article has explicit pageName / context
+            const artPage = matchedArticle.hierarchy?.pageName;
+            if (artPage) {
+              const sec = getSectionFromContext(matchedArticle.contexts?.[0], artPage);
+              if (updatedNode.section !== sec.sectionLabel || updatedNode.sectionKey !== sec.sectionKey) {
+                hasChanges = true;
+                updatedNode = {
+                  ...updatedNode,
+                  section: sec.sectionLabel,
+                  sectionKey: sec.sectionKey,
+                };
+              }
+            }
           }
 
           if (updatedNode.children && updatedNode.children.length > 0) {
@@ -303,7 +259,7 @@ export function HelpAdminRightClickModal() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
 
-  // Recursively collect all folder IDs for Explode All functionality
+  // Recursively collect all folder IDs for Explode All functionality within current section
   const getAllFolderIds = (list: HelpAdminNode[]): string[] => {
     let ids: string[] = [];
     for (const node of list) {
@@ -317,7 +273,7 @@ export function HelpAdminRightClickModal() {
     return ids;
   };
 
-  const allFolderIds = useMemo(() => getAllFolderIds(nodes), [nodes]);
+  const allFolderIds = useMemo(() => getAllFolderIds(sectionNodes), [sectionNodes]);
   const isAllExploded = allFolderIds.length > 0 && allFolderIds.every((id) => expandedIds.has(id));
 
   const handleExplodeAll = () => {
@@ -335,7 +291,7 @@ export function HelpAdminRightClickModal() {
 
   // Compute breadcrumb trail matching the user's attached design (Home Icon › Root Name › Subfolder › File)
   const breadcrumbs = useMemo(() => {
-    const rootName = context && context !== "Workspace" ? context : "My Drawings";
+    const rootName = activeSection.sectionLabel;
     const trail: { id: string | null; name: string }[] = [{ id: null, name: rootName }];
     if (!currentFolderId) return trail;
 
@@ -355,12 +311,12 @@ export function HelpAdminRightClickModal() {
       return null;
     };
 
-    const path = findPath(nodes, currentFolderId, []);
+    const path = findPath(sectionNodes, currentFolderId, []);
     if (path) {
       return [...trail, ...path];
     }
     return trail;
-  }, [nodes, currentFolderId, context]);
+  }, [sectionNodes, currentFolderId, activeSection]);
 
   // Persist nodes to localStorage whenever changed
   useEffect(() => {
@@ -559,7 +515,58 @@ export function HelpAdminRightClickModal() {
         return;
       }
 
+      if (modalRef.current && modalRef.current.contains(target as Node)) {
+        return;
+      }
+
       e.preventDefault();
+
+      // Resolve the exact tab/section where the user right-clicked
+      let el = target;
+      let detectedContextKey: string | null = null;
+      let detectedLabel: string | null = null;
+
+      while (el && el !== document.body) {
+        const ctx = el.getAttribute?.("data-hms-context");
+        if (ctx) {
+          detectedContextKey = ctx;
+          detectedLabel = el.getAttribute?.("data-hms-label") || labelForContext(ctx);
+          break;
+        }
+        const dashTab = el.getAttribute?.("data-dashboard-tab") || el.getAttribute?.("data-tab-value");
+        if (dashTab) {
+          if (dashTab === "site-recordings") {
+            detectedContextKey = "section-site-recordings";
+            detectedLabel = "Site Recordings";
+            break;
+          }
+          if (dashTab === "patrol") {
+            detectedContextKey = "section-site-patrol";
+            detectedLabel = "My Site Patrol";
+            break;
+          }
+          if (dashTab === "drawings") {
+            detectedContextKey = "section-my-drawings";
+            detectedLabel = "My Drawings";
+            break;
+          }
+          if (dashTab === "videos") {
+            detectedContextKey = "section-drawing-videos";
+            detectedLabel = "Drawing - Videos";
+            break;
+          }
+        }
+        el = el.parentElement;
+      }
+
+      const resolved = getSectionFromContext(
+        detectedContextKey || contextKey,
+        detectedLabel || context
+      );
+
+      setActiveSection(resolved);
+      setContext(detectedContextKey || resolved.sectionKey, detectedLabel || resolved.sectionLabel);
+      setCurrentFolderId(null);
 
       const modalW = modalSize.width;
       const modalH = modalSize.height;
@@ -589,7 +596,7 @@ export function HelpAdminRightClickModal() {
       document.removeEventListener("contextmenu", handleContextMenu);
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [isHelpAdmin, isDragging, isResizing, previewNode, addDialogOpen, modalSize]);
+  }, [isHelpAdmin, isDragging, isResizing, previewNode, addDialogOpen, modalSize, contextKey, context, setContext]);
 
   // Handle header position dragging
   const handleHeaderMouseDown = (e: React.MouseEvent) => {
@@ -879,11 +886,28 @@ export function HelpAdminRightClickModal() {
       });
     }
 
+    const findNodeById = (list: HelpAdminNode[], id: string): HelpAdminNode | null => {
+      for (const item of list) {
+        if (item.id === id) return item;
+        if (item.children) {
+          const res = findNodeById(item.children, id);
+          if (res) return res;
+        }
+      }
+      return null;
+    };
+
+    const parentNode = targetParentId ? findNodeById(nodes, targetParentId) : null;
+    const nodeSection = parentNode?.section || activeSection.sectionLabel;
+    const nodeSectionKey = parentNode?.sectionKey || activeSection.sectionKey;
+
     const newNode: HelpAdminNode = {
       id: `node-${Date.now()}`,
       name: baseName,
       kind,
       parentId: targetParentId,
+      section: nodeSection,
+      sectionKey: nodeSectionKey,
       owner: user?.name || (user?.role === "admin" ? "Superadmin" : "Help Admin"),
       modified: "Just now",
       size: formatFileSize(file.size),
@@ -894,7 +918,14 @@ export function HelpAdminRightClickModal() {
     const mappedType: ContentType =
       kind === "pdf" ? "pdf" : kind === "video" ? "video" : kind === "image" ? "image" : "text";
 
-    const meta = getArticleContextAndHierarchy(newNode, context, contextKey, nodes);
+    const meta = getArticleContextAndHierarchy(
+      newNode,
+      context,
+      contextKey,
+      nodes,
+      activeSection.sectionLabel,
+      activeSection.sectionKey
+    );
 
     addArticle({
       id: `art-${newNode.id}`,
@@ -953,11 +984,40 @@ export function HelpAdminRightClickModal() {
     const isSuperadmin = user?.role === "admin";
     const initialStatus = isSuperadmin ? "approved" : "pending";
 
+    const findNodeById = (list: HelpAdminNode[], id: string): HelpAdminNode | null => {
+      for (const item of list) {
+        if (item.id === id) return item;
+        if (item.children) {
+          const res = findNodeById(item.children, id);
+          if (res) return res;
+        }
+      }
+      return null;
+    };
+
+    const parentNode = targetParentId ? findNodeById(nodes, targetParentId) : null;
+    const nodeSection = parentNode?.section || activeSection.sectionLabel;
+    const nodeSectionKey = parentNode?.sectionKey || activeSection.sectionKey;
+
+    const trimmedName = itemName.trim().toLowerCase();
+    const candidateList = targetParentId ? (parentNode?.children || []) : sectionNodes;
+    const alreadyExists = candidateList.some(
+      (n) => (n.kind === "folder" || n.kind === "subfolder") && n.name.trim().toLowerCase() === trimmedName
+    );
+
+    if (alreadyExists) {
+      toast.error(`A folder named "${itemName.trim()}" already exists in ${targetParentId ? `"${parentNode?.name}"` : activeSection.sectionLabel}.`);
+      return;
+    }
+
+    const newNodeId = targetParentId ? `subfolder-${Date.now()}` : `folder-${Date.now()}`;
     const newNode: HelpAdminNode = {
-      id: `node-${Date.now()}`,
+      id: newNodeId,
       name: itemName.trim(),
       kind: targetParentId ? "subfolder" : "folder",
       parentId: targetParentId,
+      section: nodeSection,
+      sectionKey: nodeSectionKey,
       owner: user?.name || (isSuperadmin ? "Superadmin" : "Help Admin"),
       modified: "Just now",
       description: itemDescription.trim(),
@@ -965,10 +1025,17 @@ export function HelpAdminRightClickModal() {
       children: [],
     };
 
-    const meta = getArticleContextAndHierarchy(newNode, context, contextKey, nodes);
+    const meta = getArticleContextAndHierarchy(
+      newNode,
+      context,
+      contextKey,
+      nodes,
+      activeSection.sectionLabel,
+      activeSection.sectionKey
+    );
 
     addArticle({
-      id: `folder-${newNode.id}`,
+      id: newNode.id,
       title: newNode.name,
       description: newNode.description || `Folder created by ${newNode.owner} for ${meta.pageName}`,
       contentType: "folder",
@@ -1068,30 +1135,63 @@ export function HelpAdminRightClickModal() {
 
     // Sync to hmsStore so Superadmin receives notification & item in Approvals tab
     const mappedType: ContentType =
-      node.kind === "pdf" ? "pdf" : node.kind === "video" ? "video" : node.kind === "image" ? "image" : "text";
+      node.kind === "folder" || node.kind === "subfolder"
+        ? "folder"
+        : node.kind === "pdf"
+        ? "pdf"
+        : node.kind === "video"
+        ? "video"
+        : node.kind === "image"
+        ? "image"
+        : "text";
 
-    const meta = getArticleContextAndHierarchy(node, context, contextKey, nodes);
+    const meta = getArticleContextAndHierarchy(
+      node,
+      context,
+      contextKey,
+      nodes,
+      activeSection.sectionLabel,
+      activeSection.sectionKey
+    );
 
-    addArticle({
-      id: `art-${node.id}`,
-      title: node.name,
-      description: node.description || `Help resource submitted by ${node.owner} for context ${meta.pageName}`,
-      contentType: mappedType,
-      contentUrl: node.contentUrl || null,
-      relatedContext: meta.relatedContext,
-      contexts: [meta.contextKey],
-      hierarchy: meta.hierarchy,
-      approvalStatus: "pending",
-      archiveStatus: "active",
-      authorId: user?.id || "sub_admin",
-      authorName: node.owner,
-      approvedBy: null,
-      approvedAt: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      tags: ["help-admin", node.kind],
-      priority: "medium",
-    });
+    const normNodeName = node.name.trim().toLowerCase();
+    const existingArticle = hmsState.articles.find(
+      (a) =>
+        a.id === node.id ||
+        a.id === `art-${node.id}` ||
+        a.id === `folder-${node.id}` ||
+        (a.contentType === mappedType && a.title.trim().toLowerCase() === normNodeName)
+    );
+
+    if (existingArticle) {
+      updateArticle(existingArticle.id, {
+        approvalStatus: "pending",
+        rejectionReason: undefined,
+        hierarchy: meta.hierarchy,
+        relatedContext: meta.relatedContext,
+      });
+    } else {
+      addArticle({
+        id: node.kind === "folder" || node.kind === "subfolder" ? node.id : `art-${node.id}`,
+        title: node.name,
+        description: node.description || `Help resource submitted by ${node.owner} for context ${meta.pageName}`,
+        contentType: mappedType,
+        contentUrl: node.contentUrl || null,
+        relatedContext: meta.relatedContext,
+        contexts: [meta.contextKey],
+        hierarchy: meta.hierarchy,
+        approvalStatus: "pending",
+        archiveStatus: "active",
+        authorId: user?.id || "sub_admin",
+        authorName: node.owner,
+        approvedBy: null,
+        approvedAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        tags: ["help-admin", node.kind],
+        priority: "medium",
+      });
+    }
 
     toast.success(`Sent "${node.name}" for approval to Superadmin (Jordan Admin)!`);
   };
@@ -1111,7 +1211,7 @@ export function HelpAdminRightClickModal() {
       .filter(Boolean) as HelpAdminNode[];
   };
 
-  const filteredNodes = useMemo(() => filterTree(nodes, search.trim().toLowerCase()), [nodes, search]);
+  const filteredNodes = useMemo(() => filterTree(sectionNodes, search.trim().toLowerCase()), [sectionNodes, search]);
 
   // Determine nodes to display in Grid View based on currentFolderId selection
   const gridDisplayNodes = useMemo(() => {
@@ -1130,7 +1230,7 @@ export function HelpAdminRightClickModal() {
       return null;
     };
 
-    const targetFolder = findFolder(nodes);
+    const targetFolder = findFolder(sectionNodes);
     if (!targetFolder || !targetFolder.children) return [];
 
     let children = targetFolder.children;
@@ -1141,7 +1241,7 @@ export function HelpAdminRightClickModal() {
       );
     }
     return children;
-  }, [nodes, filteredNodes, currentFolderId, search]);
+  }, [sectionNodes, filteredNodes, currentFolderId, search]);
 
   if ((!visible && !previewNode && !addDialogOpen) || !isHelpAdmin) return null;
 
@@ -1191,7 +1291,7 @@ export function HelpAdminRightClickModal() {
             </div>
 
             <span className="font-bold text-sm tracking-tight truncate text-slate-100">
-              {context && context !== "Workspace" ? context : "My Drawings"}
+              {activeSection.sectionLabel}
             </span>
 
             {/* Info Icon 'i' Tooltip */}
@@ -1374,7 +1474,7 @@ export function HelpAdminRightClickModal() {
 
         {/* Tree Container / Main List Area */}
         <div className="flex-1 min-h-[160px] overflow-y-auto bg-white dark:bg-card divide-y divide-border/30 custom-scrollbar">
-          {nodes.length === 0 ? (
+          {sectionNodes.length === 0 ? (
             <div
               onClick={() => openAddModal(null)}
               className="py-12 px-4 text-center cursor-pointer group transition-colors hover:bg-blue-50/50 dark:hover:bg-blue-950/20"
@@ -1464,7 +1564,7 @@ export function HelpAdminRightClickModal() {
         {/* Footer Bar with Drag-to-Resize Handle */}
         <div className="h-7 bg-slate-50 dark:bg-muted/30 px-3 border-t border-border/50 flex items-center justify-between text-[11px] text-muted-foreground shrink-0 relative">
           <span className="font-medium text-slate-600 dark:text-slate-400">
-            {nodes.length} folder{nodes.length === 1 ? "" : "s"} / item{nodes.length === 1 ? "" : "s"}
+            {sectionNodes.length} folder{sectionNodes.length === 1 ? "" : "s"} / item{sectionNodes.length === 1 ? "" : "s"}
           </span>
 
           <div className="flex items-center gap-3 pr-2">
@@ -1694,6 +1794,10 @@ export function HelpAdminRightClickModal() {
         >
           <DialogContent
             ref={previewContainerRef}
+            data-help-preview-dialog="true"
+            overlayClassName="z-[100001] hms-preview-overlay"
+            overlayStyle={{ zIndex: 100001 }}
+            onPointerDown={(e) => e.stopPropagation()}
             style={
               isFullscreen
                 ? {
@@ -1710,21 +1814,24 @@ export function HelpAdminRightClickModal() {
                     borderRadius: 0,
                     margin: 0,
                     padding: "16px",
-                    zIndex: 999999,
+                    zIndex: 1000000,
                   }
-                : undefined
+                : {
+                    zIndex: 100002,
+                  }
             }
             className={
               isFullscreen
-                ? "!fixed !inset-0 !left-0 !top-0 !right-0 !bottom-0 !w-screen !h-screen !max-w-none !max-h-none !translate-x-0 !translate-y-0 !m-0 !rounded-none !p-4 !bg-slate-950 text-white flex flex-col justify-between !border-0 z-[999999]"
-                : "rounded-2xl transition-all z-[10000] p-5 bg-card text-card-foreground border border-border/80 shadow-2xl w-[90vw] max-w-xl"
+                ? "!fixed !inset-0 !left-0 !top-0 !right-0 !bottom-0 !w-screen !h-screen !max-w-none !max-h-none !translate-x-0 !translate-y-0 !m-0 !rounded-none !p-4 !bg-slate-950 text-white flex flex-col justify-between !border-0 z-[1000000] hms-preview-dialog"
+                : "rounded-2xl transition-all z-[100002] p-5 bg-card text-card-foreground border border-border/80 shadow-2xl w-[90vw] max-w-xl hms-preview-dialog"
             }
           >
             {/* Sleek Dark Floating Navigation Pill Bar */}
             <div
-              className={`absolute left-1/2 -translate-x-1/2 z-[100000] flex items-center gap-2.5 px-4 py-2 rounded-full bg-[#18181B] dark:bg-slate-950/95 backdrop-blur-xl border border-white/20 shadow-2xl text-white text-xs select-none animate-in fade-in slide-in-from-bottom-3 duration-200 ${
+              className={`absolute left-1/2 -translate-x-1/2 z-[100003] flex items-center gap-2.5 px-4 py-2 rounded-full bg-[#18181B] dark:bg-slate-950/95 backdrop-blur-xl border border-white/20 shadow-2xl text-white text-xs select-none animate-in fade-in slide-in-from-bottom-3 duration-200 ${
                 isFullscreen ? "top-4" : "-top-14"
               }`}
+              style={{ zIndex: 100003 }}
             >
               {/* 1. Zoom In */}
               <Tooltip>

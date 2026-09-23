@@ -139,6 +139,10 @@ export function HelpNodePreviewDialog({ node, open, onOpenChange }: HelpNodePrev
       >
         <DialogContent
           ref={previewContainerRef}
+          data-help-preview-dialog="true"
+          overlayClassName="z-[100001] hms-preview-overlay"
+          overlayStyle={{ zIndex: 100001 }}
+          onPointerDown={(e) => e.stopPropagation()}
           style={
             isFullscreen
               ? {
@@ -155,21 +159,24 @@ export function HelpNodePreviewDialog({ node, open, onOpenChange }: HelpNodePrev
                   borderRadius: 0,
                   margin: 0,
                   padding: "16px",
-                  zIndex: 999999,
+                  zIndex: 1000000,
                 }
-              : undefined
+              : {
+                  zIndex: 100002,
+                }
           }
           className={
             isFullscreen
-              ? "!fixed !inset-0 !left-0 !top-0 !right-0 !bottom-0 !w-screen !h-screen !max-w-none !max-h-none !translate-x-0 !translate-y-0 !m-0 !rounded-none !p-4 !bg-slate-950 text-white flex flex-col justify-between !border-0 z-[999999]"
-              : "rounded-2xl transition-all z-[10000] p-5 bg-card text-card-foreground border border-border/80 shadow-2xl w-[90vw] max-w-xl"
+              ? "!fixed !inset-0 !left-0 !top-0 !right-0 !bottom-0 !w-screen !h-screen !max-w-none !max-h-none !translate-x-0 !translate-y-0 !m-0 !rounded-none !p-4 !bg-slate-950 text-white flex flex-col justify-between !border-0 z-[1000000] hms-preview-dialog"
+              : "rounded-2xl transition-all z-[100002] p-5 bg-card text-card-foreground border border-border/80 shadow-2xl w-[90vw] max-w-xl hms-preview-dialog"
           }
         >
           {/* Sleek Floating Control Bar */}
           <div
-            className={`absolute left-1/2 -translate-x-1/2 z-[100000] flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#18181B] dark:bg-slate-950/95 backdrop-blur-xl border border-white/20 shadow-2xl text-white text-xs select-none animate-in fade-in slide-in-from-bottom-3 duration-200 ${
+            className={`absolute left-1/2 -translate-x-1/2 z-[100003] flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#18181B] dark:bg-slate-950/95 backdrop-blur-xl border border-white/20 shadow-2xl text-white text-xs select-none animate-in fade-in slide-in-from-bottom-3 duration-200 ${
               isFullscreen ? "top-4" : "-top-12"
             }`}
+            style={{ zIndex: 100003 }}
           >
             {/* Zoom In */}
             <Tooltip>

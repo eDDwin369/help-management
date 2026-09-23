@@ -54,6 +54,7 @@ import {
 } from "./hmsStore";
 import { trackHmsEvent } from "@/lib/hms-analytics";
 import { HelpNodeTreeView } from "@/components/help/HelpNodeTreeView";
+import { getSectionFromContext } from "@/lib/help-nodes";
 
 const NAVY = "#102040";
 
@@ -1180,7 +1181,7 @@ function AiChatView({
   onMyRequests: () => void;
   onContentLibrary: () => void;
 }) {
-  const { state, context } = useHmsStore();
+  const { state, context, contextKey } = useHmsStore();
   const [messages, setMessages] = useState<
     Array<{
       id: string;
@@ -1195,7 +1196,13 @@ function AiChatView({
   const bottomRef = useRef<HTMLDivElement>(null);
   const sentInitialRef = useRef<string | null>(null);
 
-  const contextTitle = context.split(" › ")[0] || "OomniEye Digital Twin";
+  const activeSection = useMemo(
+    () => getSectionFromContext(contextKey, context),
+    [contextKey, context]
+  );
+  const sectionTitle = activeSection.sectionLabel || "Site Recordings";
+
+  const contextTitle = context.split(" › ")[0] || sectionTitle;
   const videoName = context.includes(" › ")
     ? context.split(" › ").slice(1).join(" › ")
     : context;
@@ -1221,58 +1228,100 @@ function AiChatView({
             a.tags.some((t) => t.toLowerCase().includes(query))),
       );
 
-      let aiText = "Here is what I found in Site Recordings Help to answer your question:";
+      let aiText = `Here is what I found in ${sectionTitle} Help to answer your question:`;
       if (query.includes("present") || query.includes("summary") || query.includes("summarize")) {
-        aiText = `Here's a summary of the Site Recordings:\n\n` +
-          `• Overview: 27 active video recordings & 360° patrol sessions captured across Level 2 (KL-Ar-L2 Zone).\n` +
-          `• Key Session: Latest entry "structure-plan-1-may-26-19-34-18.mp4" recorded in 1920x960 HD resolution.\n` +
-          `• Activity Log: 14 recent recordings captured with timestamped spatial annotations & motion tracking.\n` +
-          `• Operational Status: All session logs synced & archived. 2 pending inspection items awaiting review.`;
+        if (activeSection.sectionKey === "section-site-recordings") {
+          aiText =
+            `Here's a summary of Site Recordings:\n\n` +
+            `• Overview: 27 active video recordings & 360° patrol sessions captured across Level 2 (KL-Ar-L2 Zone).\n` +
+            `• Key Session: Latest entry "structure-plan-1-may-26-19-34-18.mp4" recorded in 1920x960 HD resolution.\n` +
+            `• Activity Log: 14 recent recordings captured with timestamped spatial annotations & motion tracking.\n` +
+            `• Operational Status: All session logs synced & archived. 2 pending inspection items awaiting review.`;
+        } else if (activeSection.sectionKey === "section-site-patrol") {
+          aiText =
+            `Here's a summary of My Site Patrol:\n\n` +
+            `• Overview: Active patrol routes, digital twin checkpoints, and technician inspection tracking.\n` +
+            `• Key Route: Latest patrol session logged with verified motion paths and spatial checkpoint pins.\n` +
+            `• Activity Log: Scheduled patrol runs synced with digital twin floorplans and timestamped observations.\n` +
+            `• Operational Status: Patrol coverage active. All checkpoint telemetry verified and logged.`;
+        } else if (activeSection.sectionKey === "section-my-drawings") {
+          aiText =
+            `Here's a summary of My Drawings:\n\n` +
+            `• Overview: Complete architectural blueprints, floor plans, and spatial design sets for active facilities.\n` +
+            `• Key Drawing: Latest structural drawings and zone layouts synchronized with CAD layers.\n` +
+            `• Activity Log: Drawing annotations, measure tags, and version revisions tracked.\n` +
+            `• Operational Status: All drawings verified and linked to digital twin navigation coordinates.`;
+        } else if (activeSection.sectionKey === "section-drawing-videos") {
+          aiText =
+            `Here's a summary of Drawing - Videos:\n\n` +
+            `• Overview: Synchronized video tours and 3D plan animations mapped directly to structural drawings.\n` +
+            `• Key Video: Spatial walkthroughs and layer inspections recorded in high-definition video.\n` +
+            `• Activity Log: Pinned video sensor logs and spatial walkthrough sessions archived.\n` +
+            `• Operational Status: Video assets verified and available for interactive playback.`;
+        } else if (activeSection.sectionKey === "section-tickets") {
+          aiText =
+            `Here's a summary of My Tickets:\n\n` +
+            `• Overview: Customer support tickets, issue reports, and maintenance requests across all zones.\n` +
+            `• Key Ticket: Priority status tracking and administrative resolution updates.\n` +
+            `• Activity Log: Ongoing ticket investigations, audit remarks, and technician correspondence.\n` +
+            `• Operational Status: Ticket queue synchronized with administrative support team.`;
+        } else {
+          aiText =
+            `Here's a summary of ${sectionTitle}:\n\n` +
+            `• Overview: Operational procedures, verified guidelines, and documentation for ${sectionTitle}.\n` +
+            `• Key Guidance: Step-by-step instructions and contextual help resources.\n` +
+            `• Activity Log: Approved resources and recent procedure updates.\n` +
+            `• Operational Status: All resources verified and live for customer reference.`;
+        }
       } else if (query.includes("talk")) {
-        aiText = `Sure, let's talk about Site Recordings. What would you like to know?\n\n` +
+        aiText =
+          `Sure, let's talk about ${sectionTitle}. What would you like to know?\n\n` +
           `You can ask me about:\n` +
-          `• Video playback controls & 360° camera angles\n` +
-          `• Site patrol schedules & technician check-ins\n` +
-          `• Technical resolution, timestamps & export options\n\n` +
+          `• Key workflows & operational procedures\n` +
+          `• Finding approved documentation and reference materials\n` +
+          `• Step-by-step guidance for ${sectionTitle}\n\n` +
           `Feel free to type your question below!`;
       } else if (query.includes("help")) {
-        aiText = `I can help you with Site Recordings. What do you need help with?\n\n` +
+        aiText =
+          `I can help you with ${sectionTitle}. What do you need help with?\n\n` +
           `Here are common areas I can assist you with:\n` +
-          `1️⃣ Finding & filtering specific recordings or timestamped events\n` +
-          `2️⃣ Viewing 360° patrol feeds in Grid or Table view\n` +
-          `3️⃣ Exporting HD video logs or sharing recordings\n` +
-          `4️⃣ Raising a support request for missing or corrupted recording files`;
+          `1️⃣ Finding & filtering approved resources for ${sectionTitle}\n` +
+          `2️⃣ Understanding operational procedures and guides\n` +
+          `3️⃣ Accessing files and folder structures\n` +
+          `4️⃣ Raising a support request for missing materials`;
       } else if (query.includes("teach") || query.includes("guide") || query.includes("tutorial")) {
-        aiText = `I can teach you about Site Recordings. What would you like to learn?\n\n` +
-          `Here is a quick overview of Site Recordings concepts & features:\n\n` +
-          `📹 What are Site Recordings?\n` +
-          `Automated high-definition video captures of site inspections, patrol check-ins, and 360° digital twin walk-throughs.\n\n` +
-          `🔍 Grid vs. Table View\n` +
-          `• Grid View displays video thumbnail cards with playback durations.\n` +
-          `• Table View gives detailed metadata rows including session IDs, resolutions, and file sizes.\n\n` +
-          `⏱️ Timestamp Scrubbing & Motion Detection\n` +
-          `Click any recording to jump to specific motion events or inspect technician check-in timestamps.\n\n` +
-          `💾 Archiving & Exporting\n` +
-          `All recordings are encrypted and auto-archived. You can bulk download or share direct playback links.`;
+        aiText =
+          `I can teach you about ${sectionTitle}. What would you like to learn?\n\n` +
+          `Here is a quick overview of ${sectionTitle} concepts & features:\n\n` +
+          `📌 Key Purpose\n` +
+          `Centralized access to operational workflows, inspections, and verified digital twin assets.\n\n` +
+          `🔍 Organization\n` +
+          `All approved materials are arranged in structured folders linked directly to ${sectionTitle}.\n\n` +
+          `💾 Verified Resources\n` +
+          `Use the file structure below to browse approved documents, media, and reference guidelines.`;
       } else if (query.includes("timeline") || query.includes("events") || query.includes("timestamp")) {
-        aiText = `⏱️ Timestamp Breakdown & Key Events (Site Recordings):\n\n` +
-          `• 0:00 - 0:01: Video stream initialized at KL-Ar-L2 zone (Session 2).\n` +
-          `• 0:01 - 0:03: Motion sensor auto-detects site patrol technician entry.\n` +
-          `• 0:03 - 0:05: Verification complete; session recording saved & archived.`;
+        aiText =
+          `⏱️ Timestamp Breakdown & Key Events (${sectionTitle}):\n\n` +
+          `• 0:00 - 0:01: Session initialized at KL-Ar-L2 zone.\n` +
+          `• 0:01 - 0:03: Motion sensor auto-detects technician entry.\n` +
+          `• 0:03 - 0:05: Verification complete; session logs saved & archived.`;
       } else if (query.includes("technical") || query.includes("specs") || query.includes("resolution")) {
-        aiText = `⚙️ Technical Metadata & Resolution (Site Recordings):\n\n` +
+        aiText =
+          `⚙️ Technical Metadata & Specifications (${sectionTitle}):\n\n` +
+          `• Section: ${sectionTitle}\n` +
           `• Resolution: 1920x960 (HD Wide-angle Stream)\n` +
           `• Captured Date: May 1, 2026, 07:36 PM\n` +
-          `• Session Duration: 5 sec · Session #2 (KL-Ar-L2)\n` +
-          `• Session Window: Started May 1, 6:05 PM — Closed May 7, 7:52 PM`;
+          `• Telemetry Status: Synchronized & Verified`;
       } else if (query.includes("recommend") || query.includes("content")) {
-        aiText = `💡 Recommended Manager Resources for Site Recordings:\n\n` +
-          `• Operational Workflow Guide for Site Recordings\n` +
-          `• Video Playback & Incident Scrubbing Manual\n` +
-          `• Superadmin Audit & Compliance Workflows`;
+        aiText =
+          `💡 Recommended Resources for ${sectionTitle}:\n\n` +
+          `• Operational Workflow Guide for ${sectionTitle}\n` +
+          `• Approved Procedures & Inspection Manual\n` +
+          `• Audit & Compliance Verification Workflows`;
       } else if (matched.length === 0) {
-        aiText = `📌 Site Recordings AI Response for "${promptText}":\n\n` +
-          `• Context: Site Recordings provides real-time digital twin monitoring and audit logging.\n` +
+        aiText =
+          `📌 ${sectionTitle} AI Response for "${promptText}":\n\n` +
+          `• Context: ${sectionTitle} provides real-time digital twin monitoring and operational workflows.\n` +
           `• Help Articles: Browse related guides below or use the search bar to locate specific operational procedures.`;
       }
 
@@ -1399,7 +1448,12 @@ function AiChatView({
                     <Folder className="size-3.5 text-amber-500" />
                     <span>File Structures as in Help Admin:</span>
                   </div>
-                  <HelpNodeTreeView compact showSearch={true} />
+                  <HelpNodeTreeView
+                    compact
+                    showSearch={true}
+                    sectionKey={activeSection.sectionKey}
+                    sectionLabel={activeSection.sectionLabel}
+                  />
                 </div>
               )}
             </div>
@@ -3054,9 +3108,41 @@ export function HmsPanel() {
     if (!isOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        closePanel();
+      const target = e.target as HTMLElement | null;
+      if (!target || !panelRef.current) return;
+
+      // Do NOT close panel if clicking inside the panel
+      if (panelRef.current.contains(target)) return;
+
+      // Do NOT close panel if clicking inside any dialog, modal, portal, or overlay outside HmsPanel
+      const dialog = target.closest?.('[role="dialog"]');
+      if (dialog && dialog !== panelRef.current) return;
+
+      if (
+        target.closest?.('[role="menu"]') ||
+        target.closest?.('[data-radix-portal]') ||
+        target.closest?.('[data-radix-dialog-content]') ||
+        target.closest?.('[data-radix-dialog-overlay]') ||
+        target.closest?.('[data-radix-focus-guard]') ||
+        target.closest?.('[data-radix-popper-content-wrapper]') ||
+        target.closest?.('.toaster') ||
+        target.closest?.('.hms-preview-dialog') ||
+        target.closest?.('.hms-preview-overlay') ||
+        target.closest?.('[data-help-preview-dialog]')
+      ) {
+        return;
       }
+
+      // Do NOT close panel if an image preview dialog is currently open in the DOM
+      if (
+        document.querySelector('[data-help-preview-dialog="true"]') ||
+        document.querySelector('.hms-preview-dialog') ||
+        document.querySelector('[data-radix-dialog-overlay]')
+      ) {
+        return;
+      }
+
+      closePanel();
     };
 
     const timer = setTimeout(() => {

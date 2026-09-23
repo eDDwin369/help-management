@@ -20,11 +20,14 @@ import {
   loadSavedNodes,
   getAllFolderIds,
   filterNodes,
+  matchesNodeSection,
 } from "@/lib/help-nodes";
 import { HelpNodePreviewDialog } from "./HelpNodePreviewDialog";
 
 interface HelpNodeTreeViewProps {
   initialNodes?: HelpAdminNode[];
+  sectionKey?: string;
+  sectionLabel?: string;
   onSelectNode?: (node: HelpAdminNode) => void;
   compact?: boolean;
   className?: string;
@@ -34,6 +37,8 @@ interface HelpNodeTreeViewProps {
 
 export function HelpNodeTreeView({
   initialNodes,
+  sectionKey,
+  sectionLabel,
   onSelectNode,
   compact = false,
   className = "",
@@ -42,9 +47,20 @@ export function HelpNodeTreeView({
 }: HelpNodeTreeViewProps) {
   const [nodes, setNodes] = useState<HelpAdminNode[]>(() => initialNodes || loadSavedNodes());
   const [search, setSearch] = useState("");
+
+  const sectionScopedNodes = useMemo(() => {
+    if (!sectionKey && !sectionLabel) return nodes;
+    return nodes.filter((n) =>
+      matchesNodeSection(n, sectionKey || "", sectionLabel || "")
+    );
+  }, [nodes, sectionKey, sectionLabel]);
+
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
-    // Default to expanding all top approved folders so user can immediately see contents
-    const active = filterNodes(initialNodes || loadSavedNodes(), "", true);
+    let base = initialNodes || loadSavedNodes();
+    if (sectionKey || sectionLabel) {
+      base = base.filter((n) => matchesNodeSection(n, sectionKey || "", sectionLabel || ""));
+    }
+    const active = filterNodes(base, "", onlyApproved);
     const all = getAllFolderIds(active);
     return new Set(all);
   });
@@ -70,9 +86,18 @@ export function HelpNodeTreeView({
     };
   }, [initialNodes]);
 
+  // Re-sync expanded IDs whenever the section changes
+  useEffect(() => {
+    if (sectionKey || sectionLabel) {
+      const active = filterNodes(sectionScopedNodes, "", onlyApproved);
+      const all = getAllFolderIds(active);
+      setExpandedIds(new Set(all));
+    }
+  }, [sectionKey, sectionLabel, sectionScopedNodes, onlyApproved]);
+
   const filteredNodes = useMemo(() => {
-    return filterNodes(nodes, search, onlyApproved);
-  }, [nodes, search, onlyApproved]);
+    return filterNodes(sectionScopedNodes, search, onlyApproved);
+  }, [sectionScopedNodes, search, onlyApproved]);
 
   const allFolderIds = useMemo(() => getAllFolderIds(filteredNodes), [filteredNodes]);
   const isAllExpanded = allFolderIds.length > 0 && allFolderIds.every((id) => expandedIds.has(id));

@@ -665,16 +665,60 @@ function loadPersistedState(): HmsState {
     if (!raw) return DEFAULT_STATE;
     const parsed = JSON.parse(raw) as Partial<HmsState>;
     if (!Array.isArray(parsed.articles) || !Array.isArray(parsed.tickets)) return DEFAULT_STATE;
-    const DUMMY_IDS = new Set(["folder-001", "art-027", "art-028", "art-029"]);
+    const DUMMY_IDS = new Set([
+      "folder-001",
+      "art-027",
+      "art-028",
+      "art-029",
+      "folder-test-flow",
+      "folder-site-recordings",
+      "folder-folder-test-flow",
+      "folder-folder-site-recordings",
+      "doc-test-flow-sop",
+      "video-test-flow-walkthrough",
+      "pdf-test-flow-manual",
+      "img-test-flow-map",
+      "pdf-recordings-guide",
+      "text-sensor-checklist",
+    ]);
+
+    const isDummyArticle = (a: HmsArticle): boolean => {
+      if (DUMMY_IDS.has(a.id)) return true;
+      const title = (a.title || "").toLowerCase().trim();
+      const id = (a.id || "").toLowerCase();
+      if (title === "test flow" || title === "site recordings & twin guide") return true;
+      if (id.includes("test-flow") || id.includes("site-recordings-table-guide")) return true;
+      return false;
+    };
+
+    const seenIds = new Set<string>();
+    const seenFolderKeys = new Set<string>();
+    const deduplicatedArticles: HmsArticle[] = [];
+
+    for (const a of parsed.articles) {
+      if (isDummyArticle(a)) continue;
+      if (seenIds.has(a.id)) continue;
+
+      if (a.contentType === "folder") {
+        const folderKey = `${(a.hierarchy?.pageName || "").toLowerCase()}::${(a.title || "").toLowerCase().trim()}`;
+        if (seenFolderKeys.has(folderKey)) {
+          seenIds.add(a.id);
+          continue;
+        }
+        seenFolderKeys.add(folderKey);
+      }
+
+      seenIds.add(a.id);
+      deduplicatedArticles.push({
+        ...a,
+        contexts: a.contexts ?? [],
+        contentUrl: a.contentUrl ?? ARTICLE_MEDIA[a.id] ?? null,
+        body: a.body ?? bodyForArticle(a.id),
+      });
+    }
+
     return {
-      articles: parsed.articles
-        .filter((a) => !DUMMY_IDS.has(a.id))
-        .map((a) => ({
-          ...a,
-          contexts: a.contexts ?? [],
-          contentUrl: a.contentUrl ?? ARTICLE_MEDIA[a.id] ?? null,
-          body: a.body ?? bodyForArticle(a.id),
-        })),
+      articles: deduplicatedArticles,
       tickets: parsed.tickets,
       notifications: parsed.notifications ?? DEFAULT_STATE.notifications,
     };
@@ -699,7 +743,40 @@ function reducer(state: HmsState, action: Action): HmsState {
   switch (action.type) {
     case "HYDRATE":
       return action.state;
-    case "ADD_ARTICLE":
+    case "ADD_ARTICLE": {
+      // Prevent duplicate folders or duplicate IDs
+      const normTitle = (action.article.title || "").toLowerCase().trim();
+      const normPage = (action.article.hierarchy?.pageName || "").toLowerCase().trim();
+      const cleanArticleId = action.article.id.replace(/^(folder-|art-)/, "");
+
+      const existingIndex = state.articles.findIndex((a) => {
+        if (a.id === action.article.id) return true;
+        const aCleanId = a.id.replace(/^(folder-|art-)/, "");
+        if (aCleanId === cleanArticleId) return true;
+
+        if (action.article.contentType === "folder" && a.contentType === "folder") {
+          const aPage = (a.hierarchy?.pageName || "").toLowerCase().trim();
+          const aTitle = (a.title || "").toLowerCase().trim();
+          return aTitle === normTitle && (!normPage || !aPage || aPage === normPage);
+        }
+        return false;
+      });
+
+      if (existingIndex >= 0) {
+        const existing = state.articles[existingIndex];
+        const updated = [...state.articles];
+        updated[existingIndex] = {
+          ...existing,
+          ...action.article,
+          id: existing.id, // preserve stable ID
+          updatedAt: now,
+        };
+        return {
+          ...state,
+          articles: updated,
+        };
+      }
+
       return {
         ...state,
         articles: [action.article, ...state.articles],
@@ -708,6 +785,7 @@ function reducer(state: HmsState, action: Action): HmsState {
             ? { ...state.notifications, admin: state.notifications.admin + 1 }
             : { ...state.notifications, customer: state.notifications.customer + 1 },
       };
+    }
     case "UPDATE_ARTICLE":
       return {
         ...state,

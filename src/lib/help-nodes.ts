@@ -3,6 +3,8 @@ export interface HelpAdminNode {
   name: string;
   kind: "folder" | "subfolder" | "pdf" | "video" | "image" | "text";
   parentId?: string | null;
+  section?: string;
+  sectionKey?: string;
   owner: string;
   size?: string;
   modified: string;
@@ -22,118 +24,232 @@ export const SAMPLE_MEDIA: Record<string, string> = {
 
 export const LOCAL_STORAGE_NODES_KEY = "hms_help_admin_nodes_v2";
 
-export const DEFAULT_STARTER_NODES: HelpAdminNode[] = [
-  {
-    id: "folder-test-flow",
-    name: "Test Flow",
-    kind: "folder",
-    owner: "Jordan Admin",
-    modified: "May 20, 2026",
-    approvalStatus: "approved",
-    description: "Standard operational test flow and live site inspection templates.",
-    children: [
-      {
-        id: "doc-test-flow-sop",
-        name: "Test Flow SOP & Guidelines",
-        kind: "text",
-        parentId: "folder-test-flow",
-        owner: "Jordan Admin",
-        modified: "May 20, 2026",
-        approvalStatus: "approved",
-        description: "Official procedure for site patrol recordings, motion verification, and digital twin log export.",
-        contentUrl: "Standard Operating Procedure (SOP):\n1. Initiate video stream on Level 2 (KL-Ar-L2 Zone).\n2. Verify 360 camera angle calibration and spatial pins.\n3. Record patrol session with timestamp tags.\n4. Export MP4 logs or sync with compliance records.",
-      },
-      {
-        id: "video-test-flow-walkthrough",
-        name: "Site Walkthrough Session.mp4",
-        kind: "video",
-        parentId: "folder-test-flow",
-        owner: "Jordan Admin",
-        modified: "May 20, 2026",
-        size: "18.4 MB",
-        approvalStatus: "approved",
-        contentUrl: "/help/my-drawings-tour.mp4",
-        description: "High-definition recorded patrol walkthrough session with 360 motion tracking.",
-      },
-      {
-        id: "pdf-test-flow-manual",
-        name: "Inspection Reference Manual.pdf",
-        kind: "pdf",
-        parentId: "folder-test-flow",
-        owner: "Jordan Admin",
-        modified: "May 19, 2026",
-        size: "2.1 MB",
-        approvalStatus: "approved",
-        contentUrl: "/help/site-recordings-table-guide.pdf",
-        description: "Complete technical reference manual for inspection logging and zone maintenance.",
-      },
-      {
-        id: "img-test-flow-map",
-        name: "Level 2 Spatial Annotation Map.jpg",
-        kind: "image",
-        parentId: "folder-test-flow",
-        owner: "Jordan Admin",
-        modified: "May 18, 2026",
-        size: "1.4 MB",
-        approvalStatus: "approved",
-        contentUrl: "/help/pin-location-map.jpg",
-        description: "Architectural floor plan showing pinned video sensor positions.",
-      },
-    ],
-  },
-  {
-    id: "folder-site-recordings",
-    name: "Site Recordings & Twin Guide",
-    kind: "folder",
-    owner: "Jordan Admin",
-    modified: "May 15, 2026",
-    approvalStatus: "approved",
-    description: "Digital twin video playback instructions, motion logs, and zone maps.",
-    children: [
-      {
-        id: "pdf-recordings-guide",
-        name: "360 Patrol Capture Guide.pdf",
-        kind: "pdf",
-        parentId: "folder-site-recordings",
-        owner: "Jordan Admin",
-        modified: "May 15, 2026",
-        size: "3.4 MB",
-        approvalStatus: "approved",
-        contentUrl: "/help/site-recordings-table-guide.pdf",
-        description: "Guide to operating 360 degree cameras in industrial digital twin environments.",
-      },
-      {
-        id: "text-sensor-checklist",
-        name: "Sensor Calibration Checklist",
-        kind: "text",
-        parentId: "folder-site-recordings",
-        owner: "Jordan Admin",
-        modified: "May 14, 2026",
-        approvalStatus: "approved",
-        description: "Daily checklist for site operators before initiating scheduled video patrol runs.",
-        contentUrl: "Pre-Flight Sensor Checklist:\n• Check lens cleanliness\n• Verify battery level > 80%\n• Confirm Wi-Fi/LTE telemetry link\n• Calibrate gyroscope & GPS coordinates",
-      },
-    ],
-  },
-];
+/**
+ * Maps any context key or label to its canonical top-level section key & label.
+ */
+export function getSectionFromContext(
+  key?: string,
+  label?: string
+): { sectionKey: string; sectionLabel: string } {
+  const normKey = (key || "").toLowerCase();
+  const normLabel = (label || "").toLowerCase();
+
+  // 1. Site Recordings
+  if (
+    normKey.includes("site-recordings") ||
+    normKey.includes("recordings") ||
+    normLabel.includes("site recording")
+  ) {
+    return { sectionKey: "section-site-recordings", sectionLabel: "Site Recordings" };
+  }
+
+  // 2. My Site Patrol
+  if (
+    normKey.includes("site-patrol") ||
+    normKey.includes("patrol") ||
+    normLabel.includes("site patrol")
+  ) {
+    return { sectionKey: "section-site-patrol", sectionLabel: "My Site Patrol" };
+  }
+
+  // 3. My Drawings
+  if (
+    normKey.includes("my-drawings") ||
+    (normKey.includes("drawings") && !normKey.includes("video")) ||
+    normLabel.includes("my drawing")
+  ) {
+    return { sectionKey: "section-my-drawings", sectionLabel: "My Drawings" };
+  }
+
+  // 4. Drawing - Videos
+  if (
+    normKey.includes("drawing-videos") ||
+    normKey.includes("videos") ||
+    (normLabel.includes("drawing") && normLabel.includes("video"))
+  ) {
+    return { sectionKey: "section-drawing-videos", sectionLabel: "Drawing - Videos" };
+  }
+
+  // 5. Tickets
+  if (normKey.includes("ticket") || normLabel.includes("ticket")) {
+    return { sectionKey: "section-tickets", sectionLabel: "My Tickets" };
+  }
+
+  // 6. Admin Coverage
+  if (
+    normKey.includes("admin-coverage") ||
+    normLabel.includes("without help") ||
+    normLabel.includes("coverage")
+  ) {
+    return { sectionKey: "section-admin-coverage", sectionLabel: "Areas Without Help" };
+  }
+
+  // 7. Admin Content / Approvals
+  if (
+    normKey.includes("admin-content") ||
+    normLabel.includes("approval") ||
+    normLabel.includes("content library")
+  ) {
+    return { sectionKey: "section-admin-content", sectionLabel: "Approvals" };
+  }
+
+  // 8. Admin Overview / Dashboard
+  if (normKey.includes("admin") || normLabel.includes("dashboard")) {
+    return { sectionKey: "section-admin-overview", sectionLabel: "Dashboard" };
+  }
+
+  // 9. Browser pathname fallback
+  if (typeof window !== "undefined") {
+    const p = window.location.pathname;
+    if (p.startsWith("/tickets")) return { sectionKey: "section-tickets", sectionLabel: "My Tickets" };
+    if (p.startsWith("/admin")) return { sectionKey: "section-admin-overview", sectionLabel: "Dashboard" };
+    if (p.startsWith("/dashboard")) {
+      if (typeof document !== "undefined") {
+        const activeTabEl = document.querySelector("[data-dashboard-tab]");
+        const tabVal = activeTabEl?.getAttribute("data-dashboard-tab");
+        if (tabVal === "patrol") return { sectionKey: "section-site-patrol", sectionLabel: "My Site Patrol" };
+        if (tabVal === "drawings") return { sectionKey: "section-my-drawings", sectionLabel: "My Drawings" };
+        if (tabVal === "videos") return { sectionKey: "section-drawing-videos", sectionLabel: "Drawing - Videos" };
+        if (tabVal === "site-recordings") return { sectionKey: "section-site-recordings", sectionLabel: "Site Recordings" };
+      }
+      return { sectionKey: "section-site-recordings", sectionLabel: "Site Recordings" };
+    }
+  }
+
+  return { sectionKey: "section-site-recordings", sectionLabel: "Site Recordings" };
+}
+
+/**
+ * Checks whether a HelpAdminNode belongs to the specified section.
+ */
+export function matchesNodeSection(
+  node: HelpAdminNode,
+  currentSectionKey: string,
+  currentSectionLabel: string
+): boolean {
+  const targetKey = currentSectionKey.toLowerCase().trim();
+  const targetLabel = currentSectionLabel.toLowerCase().trim();
+
+  const nodeSection = (node.section || "").toLowerCase().trim();
+  const nodeKey = (node.sectionKey || "").toLowerCase().trim();
+
+  // If node has explicit section metadata
+  if (nodeSection || nodeKey) {
+    return (
+      nodeSection === targetLabel ||
+      nodeKey === targetKey ||
+      nodeSection === targetKey ||
+      nodeKey === targetLabel
+    );
+  }
+
+  // Heuristic matching for legacy nodes
+  const nodeName = node.name.toLowerCase();
+  const nodeId = node.id.toLowerCase();
+
+  if (nodeId.includes("patrol") || nodeName.includes("patrol")) {
+    return targetLabel === "my site patrol" || targetKey === "section-site-patrol";
+  }
+  if (nodeId.includes("site-recordings") || nodeName.includes("site recording")) {
+    return targetLabel === "site recordings" || targetKey === "section-site-recordings";
+  }
+  if (
+    nodeId.includes("drawing-video") ||
+    nodeName.includes("drawing-video") ||
+    (nodeName.includes("drawing") && nodeName.includes("video"))
+  ) {
+    return targetLabel === "drawing - videos" || targetKey === "section-drawing-videos";
+  }
+  if (nodeId.includes("drawing") || nodeName.includes("drawing")) {
+    return targetLabel === "my drawings" || targetKey === "section-my-drawings";
+  }
+  if (nodeId.includes("ticket") || nodeName.includes("ticket")) {
+    return targetLabel === "my tickets" || targetKey === "section-tickets";
+  }
+
+  // Strictly return false if unassigned or no match - do NOT default to Site Recordings
+  return false;
+}
+
+export function isDummyNode(node: HelpAdminNode): boolean {
+  const id = (node.id || "").toLowerCase();
+  const name = (node.name || "").toLowerCase().trim();
+  return (
+    id === "folder-test-flow" ||
+    id === "folder-site-recordings" ||
+    id === "folder-folder-test-flow" ||
+    id === "folder-folder-site-recordings" ||
+    id.includes("test-flow") ||
+    id.includes("site-recordings-table-guide") ||
+    name === "test flow" ||
+    name === "site recordings & twin guide" ||
+    id === "doc-test-flow-sop" ||
+    id === "video-test-flow-walkthrough" ||
+    id === "pdf-test-flow-manual" ||
+    id === "img-test-flow-map" ||
+    id === "pdf-recordings-guide" ||
+    id === "text-sensor-checklist"
+  );
+}
+
+export const DEFAULT_STARTER_NODES: HelpAdminNode[] = [];
+
+const STATUS_PRIORITY: Record<string, number> = {
+  approved: 4,
+  pending: 3,
+  draft: 2,
+  rejected: 1,
+  unapproved: 1,
+};
 
 export function deduplicateNodes(list: HelpAdminNode[]): HelpAdminNode[] {
   const seenIds = new Set<string>();
+  const seenFolderKeys = new Map<string, number>(); // folderKey -> index in cleanList
   const cleanList: HelpAdminNode[] = [];
 
   for (const node of list) {
+    if (isDummyNode(node)) continue;
     if (seenIds.has(node.id)) continue;
-    seenIds.add(node.id);
 
-    if (node.children && node.children.length > 0) {
+    const isFolder = node.kind === "folder" || node.kind === "subfolder";
+
+    if (isFolder) {
+      const folderKey = `${node.parentId || "root"}::${(node.sectionKey || node.section || "").toLowerCase()}::${node.name.toLowerCase().trim()}`;
+      if (seenFolderKeys.has(folderKey)) {
+        // Merge into existing folder without creating a duplicate
+        const existingIdx = seenFolderKeys.get(folderKey)!;
+        const existing = cleanList[existingIdx];
+        const existingPriority = STATUS_PRIORITY[existing.approvalStatus] || 0;
+        const newPriority = STATUS_PRIORITY[node.approvalStatus] || 0;
+        const higherStatus = newPriority > existingPriority ? node.approvalStatus : existing.approvalStatus;
+
+        const mergedChildren = deduplicateNodes([
+          ...(existing.children || []),
+          ...(node.children || []),
+        ]);
+
+        cleanList[existingIdx] = {
+          ...existing,
+          approvalStatus: higherStatus,
+          rejectionReason: higherStatus === "approved" ? undefined : (node.rejectionReason || existing.rejectionReason),
+          children: mergedChildren,
+        };
+        seenIds.add(node.id);
+        continue;
+      }
+
+      seenIds.add(node.id);
+      const cleanedChildren = node.children && node.children.length > 0 ? deduplicateNodes(node.children) : [];
+      seenFolderKeys.set(folderKey, cleanList.length);
       cleanList.push({
         ...node,
-        children: deduplicateNodes(node.children),
+        children: cleanedChildren,
       });
     } else {
+      seenIds.add(node.id);
       cleanList.push({
         ...node,
-        children: node.children ? [] : undefined,
+        children: node.children ? deduplicateNodes(node.children) : undefined,
       });
     }
   }
@@ -167,29 +283,121 @@ export function repairNodeContent(node: HelpAdminNode): HelpAdminNode {
 }
 
 export function loadSavedNodes(): HelpAdminNode[] {
-  if (typeof window === "undefined") return DEFAULT_STARTER_NODES;
+  if (typeof window === "undefined") return [];
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_NODES_KEY);
     if (!saved) {
-      // First time initialization: write default starter nodes including "Test Flow"
-      localStorage.setItem(LOCAL_STORAGE_NODES_KEY, JSON.stringify(DEFAULT_STARTER_NODES));
-      return DEFAULT_STARTER_NODES;
+      return [];
     }
     const parsed: HelpAdminNode[] = JSON.parse(saved);
-    if (!parsed || parsed.length === 0) {
-      localStorage.setItem(LOCAL_STORAGE_NODES_KEY, JSON.stringify(DEFAULT_STARTER_NODES));
-      return DEFAULT_STARTER_NODES;
+    if (!parsed || !Array.isArray(parsed) || parsed.length === 0) {
+      return [];
     }
-    // If "Test Flow" isn't present, make sure it is merged in gracefully
-    const hasTestFlow = parsed.some((n) => n.name.toLowerCase() === "test flow");
-    let combined = parsed;
-    if (!hasTestFlow) {
-      combined = [...DEFAULT_STARTER_NODES, ...parsed];
+
+    let modified = false;
+
+    // Filter out dummy nodes (like Test Flow and Site Recordings & Twin Guide)
+    const removeDummyNodes = (list: HelpAdminNode[]): HelpAdminNode[] => {
+      const filtered: HelpAdminNode[] = [];
+      for (const item of list) {
+        if (isDummyNode(item)) {
+          modified = true;
+          continue;
+        }
+        if (item.children && item.children.length > 0) {
+          const cleanedChildren = removeDummyNodes(item.children);
+          filtered.push({ ...item, children: cleanedChildren });
+        } else {
+          filtered.push(item);
+        }
+      }
+      return filtered;
+    };
+
+    const purged = removeDummyNodes(parsed);
+
+    let persistedArticles: any[] = [];
+    try {
+      const rawStore = localStorage.getItem("hmsStore.v6") || localStorage.getItem("hmsStore.v5");
+      if (rawStore) {
+        const parsedStore = JSON.parse(rawStore);
+        if (Array.isArray(parsedStore.articles)) {
+          persistedArticles = parsedStore.articles;
+        }
+      }
+    } catch {}
+
+    // Auto-migrate any nodes without section or sectionKey or with incorrect fallback
+    const migrateNodes = (list: HelpAdminNode[]): HelpAdminNode[] => {
+      return list.map((n) => {
+        let nodeCopy = { ...n };
+        const lowerName = nodeCopy.name.toLowerCase();
+
+        // 1. If name contains "patrol", ensure section is My Site Patrol
+        if (lowerName.includes("patrol")) {
+          if (nodeCopy.section !== "My Site Patrol" || nodeCopy.sectionKey !== "section-site-patrol") {
+            modified = true;
+            nodeCopy.section = "My Site Patrol";
+            nodeCopy.sectionKey = "section-site-patrol";
+          }
+        }
+
+        // 2. Cross-reference with persisted articles to recover correct section
+        if (persistedArticles.length > 0) {
+          const matched = persistedArticles.find(
+            (a) =>
+              a.id === nodeCopy.id ||
+              a.id === `art-${nodeCopy.id}` ||
+              a.id === `folder-${nodeCopy.id}` ||
+              (a.title && a.title.toLowerCase().trim() === lowerName.trim())
+          );
+          if (matched) {
+            const pageName = matched.hierarchy?.pageName || matched.relatedContext?.split(" › ")[0];
+            if (pageName) {
+              const sec = getSectionFromContext(matched.contexts?.[0], pageName);
+              if (nodeCopy.section !== sec.sectionLabel || nodeCopy.sectionKey !== sec.sectionKey) {
+                modified = true;
+                nodeCopy.section = sec.sectionLabel;
+                nodeCopy.sectionKey = sec.sectionKey;
+              }
+            }
+          }
+        }
+
+        // 3. Fallback for nodes still missing section
+        if (!nodeCopy.section || !nodeCopy.sectionKey) {
+          modified = true;
+          const sec = getSectionFromContext(nodeCopy.sectionKey, nodeCopy.section || nodeCopy.name);
+          nodeCopy.section = sec.sectionLabel;
+          nodeCopy.sectionKey = sec.sectionKey;
+        }
+
+        if (nodeCopy.children && nodeCopy.children.length > 0) {
+          nodeCopy.children = migrateNodes(nodeCopy.children).map((c) => ({
+            ...c,
+            section: c.section || nodeCopy.section,
+            sectionKey: c.sectionKey || nodeCopy.sectionKey,
+          }));
+        }
+        return nodeCopy;
+      });
+    };
+
+    const migrated = migrateNodes(purged);
+    const cleaned = deduplicateNodes(migrated.map(repairNodeContent));
+
+    if (modified || cleaned.length !== parsed.length) {
+      try {
+        localStorage.setItem(LOCAL_STORAGE_NODES_KEY, JSON.stringify(cleaned));
+      } catch (e) {
+        console.warn("Storage quota warning on migration:", e);
+      }
     }
-    return deduplicateNodes(combined.map(repairNodeContent));
+
+    return cleaned;
   } catch (e) {
     console.error("Failed to load saved help admin nodes:", e);
-    return DEFAULT_STARTER_NODES;
+    return [];
   }
 }
 
@@ -543,6 +751,21 @@ export function buildApprovedTree(
   const nodes = rawNodes || loadSavedNodes();
   const normalize = (s?: string) => s?.trim().toLowerCase() || "";
 
+  const isDummyTitleOrId = (id?: string, title?: string): boolean => {
+    const normId = normalize(id);
+    const normTitle = normalize(title);
+    return (
+      normId.includes("test-flow") ||
+      normId.includes("site-recordings-table-guide") ||
+      normTitle === "test flow" ||
+      normTitle === "site recordings & twin guide" ||
+      normId === "folder-test-flow" ||
+      normId === "folder-site-recordings" ||
+      normId === "folder-folder-test-flow" ||
+      normId === "folder-folder-site-recordings"
+    );
+  };
+
   // Helper to match node with an article from approvedArticles (or all articles)
   const findArticleForNode = (node: HelpAdminNode) => {
     return approvedArticles.find(
@@ -550,6 +773,7 @@ export function buildApprovedTree(
         a.id === node.id ||
         a.id === `art-${node.id}` ||
         a.id === `folder-${node.id}` ||
+        a.id === node.id.replace(/^(folder-|art-)/, "") ||
         normalize(a.title) === normalize(node.name)
     );
   };
@@ -559,6 +783,8 @@ export function buildApprovedTree(
 
   // Recursive converter for nodes
   const convertNode = (node: HelpAdminNode): ApprovedTreeItem | null => {
+    if (isDummyNode(node) || isDummyTitleOrId(node.id, node.name)) return null;
+
     const isFolder = node.kind === "folder" || node.kind === "subfolder";
     const matched = findArticleForNode(node);
 
@@ -571,6 +797,7 @@ export function buildApprovedTree(
             childItems.push(convertedChild);
             if (convertedChild.articleId) {
               placedArticleIds.add(convertedChild.articleId);
+              placedArticleIds.add(convertedChild.articleId.replace(/^(art-|folder-)/, ""));
             }
           }
         }
@@ -578,14 +805,20 @@ export function buildApprovedTree(
 
       // Also check if any approvedArticles belong to this folder by cardName or relatedContext
       for (const a of approvedArticles) {
+        if (isDummyTitleOrId(a.id, a.title)) continue;
+        const normCard = normalize(a.hierarchy?.cardName);
+        const normRel = normalize(a.relatedContext);
+        const normName = normalize(node.name);
+
         if (
           !placedArticleIds.has(a.id) &&
+          !placedArticleIds.has(a.id.replace(/^(art-|folder-)/, "")) &&
           a.id !== node.id &&
           a.id !== `folder-${node.id}` &&
-          (normalize(a.hierarchy?.cardName) === normalize(node.name) ||
-            normalize(a.relatedContext).includes(normalize(node.name)))
+          (normCard === normName || normRel.includes(normName))
         ) {
           placedArticleIds.add(a.id);
+          placedArticleIds.add(a.id.replace(/^(art-|folder-)/, ""));
           childItems.push({
             id: a.id,
             name: a.title,
@@ -610,6 +843,9 @@ export function buildApprovedTree(
 
       const folderArtId = matched ? matched.id : `folder-${node.id}`;
       placedArticleIds.add(folderArtId);
+      placedArticleIds.add(node.id);
+      placedArticleIds.add(`folder-${node.id}`);
+      placedArticleIds.add(node.id.replace(/^(folder-|art-)/, ""));
 
       return {
         id: node.id,
@@ -631,6 +867,8 @@ export function buildApprovedTree(
 
       const artId = matched ? matched.id : `art-${node.id}`;
       placedArticleIds.add(artId);
+      placedArticleIds.add(node.id);
+      placedArticleIds.add(node.id.replace(/^(folder-|art-)/, ""));
 
       return {
         id: node.id,
@@ -653,25 +891,59 @@ export function buildApprovedTree(
   for (const rootNode of nodes) {
     const converted = convertNode(rootNode);
     if (converted) {
-      rootTree.push(converted);
+      // Check if folder with this name already exists in rootTree
+      const existingIdx = rootTree.findIndex(
+        (rt) =>
+          (rt.kind === "folder" || rt.kind === "subfolder") &&
+          normalize(rt.name) === normalize(converted.name)
+      );
+      if (existingIdx >= 0) {
+        // Merge children into existing folder instead of duplicating
+        const existing = rootTree[existingIdx];
+        const existingChildIds = new Set(existing.children.map((c) => c.id));
+        for (const child of converted.children) {
+          if (!existingChildIds.has(child.id)) {
+            existing.children.push(child);
+            existingChildIds.add(child.id);
+          }
+        }
+      } else {
+        rootTree.push(converted);
+      }
     }
   }
 
   // 2. Check for any approvedArticles that are folders not present in savedNodes
   for (const art of approvedArticles) {
-    if (art.contentType === "folder" && !placedArticleIds.has(art.id)) {
+    if (isDummyTitleOrId(art.id, art.title)) continue;
+    if (
+      art.contentType === "folder" &&
+      !placedArticleIds.has(art.id) &&
+      !placedArticleIds.has(art.id.replace(/^(art-|folder-)/, ""))
+    ) {
       placedArticleIds.add(art.id);
+      placedArticleIds.add(art.id.replace(/^(art-|folder-)/, ""));
+
+      // Check if a folder with the same name already exists in rootTree
+      const existingInTree = rootTree.find(
+        (rt) =>
+          (rt.kind === "folder" || rt.kind === "subfolder") &&
+          normalize(rt.name) === normalize(art.title)
+      );
 
       // Find children belonging to this folder
       const childItems: ApprovedTreeItem[] = [];
       for (const childArt of approvedArticles) {
+        if (isDummyTitleOrId(childArt.id, childArt.title)) continue;
         if (
           !placedArticleIds.has(childArt.id) &&
+          !placedArticleIds.has(childArt.id.replace(/^(art-|folder-)/, "")) &&
           childArt.id !== art.id &&
           (normalize(childArt.hierarchy?.cardName) === normalize(art.title) ||
             normalize(childArt.relatedContext).includes(normalize(art.title)))
         ) {
           placedArticleIds.add(childArt.id);
+          placedArticleIds.add(childArt.id.replace(/^(art-|folder-)/, ""));
           childItems.push({
             id: childArt.id,
             name: childArt.title,
@@ -685,23 +957,40 @@ export function buildApprovedTree(
         }
       }
 
-      rootTree.push({
-        id: art.id,
-        name: art.title,
-        kind: "folder",
-        articleId: art.id,
-        archiveStatus: art.archiveStatus || "active",
-        approvalStatus: art.approvalStatus,
-        article: art,
-        children: childItems,
-      });
+      if (existingInTree) {
+        // Merge into existing folder
+        const existingChildIds = new Set(existingInTree.children.map((c) => c.id));
+        for (const child of childItems) {
+          if (!existingChildIds.has(child.id)) {
+            existingInTree.children.push(child);
+            existingChildIds.add(child.id);
+          }
+        }
+      } else {
+        rootTree.push({
+          id: art.id,
+          name: art.title,
+          kind: "folder",
+          articleId: art.id,
+          archiveStatus: art.archiveStatus || "active",
+          approvalStatus: art.approvalStatus,
+          article: art,
+          children: childItems,
+        });
+      }
     }
   }
 
   // 3. Any remaining approved articles are standalone root content
   for (const art of approvedArticles) {
-    if (!placedArticleIds.has(art.id) && art.contentType !== "folder") {
+    if (isDummyTitleOrId(art.id, art.title)) continue;
+    if (
+      !placedArticleIds.has(art.id) &&
+      !placedArticleIds.has(art.id.replace(/^(art-|folder-)/, "")) &&
+      art.contentType !== "folder"
+    ) {
       placedArticleIds.add(art.id);
+      placedArticleIds.add(art.id.replace(/^(art-|folder-)/, ""));
       rootTree.push({
         id: art.id,
         name: art.title,

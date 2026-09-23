@@ -87,7 +87,12 @@ function Dashboard() {
           </TabsList>
         </Tabs>
 
-        <div className="mt-6 bg-card border rounded-2xl shadow-sm overflow-hidden">
+        <div
+          data-hms-context={TAB_SECTION[tab] ?? "section-site-recordings"}
+          data-hms-label={TABS.find((t) => t.v === tab)?.label ?? "Site Recordings"}
+          data-dashboard-tab={tab}
+          className="mt-6 bg-card border rounded-2xl shadow-sm overflow-hidden"
+        >
           {tab === "site-recordings" && <SiteRecordingsView />}
           {tab === "drawings" && <MyDrawingsView />}
           {tab === "videos" && <DrawingVideosView />}
