@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { useHmsStore, type HmsArticle, getArticleHierarchy } from "@/components/hms/hmsStore";
+import { loadSavedNodes, type HelpAdminNode } from "@/lib/help-nodes";
 import { SnapshotViewer } from "@/components/admin/SnapshotViewer";
 import { RejectHelpModal } from "@/components/admin/RejectHelpModal";
 import {
@@ -251,6 +252,64 @@ export function ApprovalsManager({
     toast.success("Approved — live for customers");
   };
 
+  const handleOpenReject = (id: string) => {
+    const a = state.articles.find(
+      (item) =>
+        item.id === id ||
+        item.id === `art-${id}` ||
+        item.id === `folder-${id}` ||
+        item.title.toLowerCase() === id.toLowerCase()
+    );
+    if (a) {
+      setRejectingArticle(a);
+      return;
+    }
+
+    // Lookup in HelpAdmin nodes
+    const allNodes = loadSavedNodes();
+    const findNode = (list: HelpAdminNode[]): HelpAdminNode | null => {
+      for (const n of list) {
+        if (
+          n.id === id ||
+          `art-${n.id}` === id ||
+          `folder-${n.id}` === id ||
+          n.name.toLowerCase() === id.toLowerCase()
+        )
+          return n;
+        if (n.children && n.children.length > 0) {
+          const res = findNode(n.children);
+          if (res) return res;
+        }
+      }
+      return null;
+    };
+
+    const found = findNode(allNodes);
+    if (found) {
+      setRejectingArticle({
+        id: found.id,
+        title: found.name,
+        description: found.description || "",
+        contentType: (found.kind === "subfolder" ? "folder" : found.kind) as any,
+        contentUrl: found.contentUrl || null,
+        approvalStatus: found.approvalStatus as any,
+        archiveStatus: "active",
+        authorId: "sub_admin",
+        authorName: found.owner,
+        tags: [found.kind],
+        priority: "medium",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        contexts: ["site-recordings-table"],
+        hierarchy: {
+          pageName: "Site Recordings",
+          cardName: "Drawings",
+          controlName: found.name,
+        },
+      });
+    }
+  };
+
   const handleRejectConfirm = (reason: string) => {
     if (rejectingArticle) {
       unapproveArticle(rejectingArticle.id, reason);
@@ -445,7 +504,11 @@ export function ApprovalsManager({
                               : "hover:bg-muted/30"
                           }`}
                           onClick={() => setSelectedId(article.id)}
-                          onDoubleClick={() => setFullscreenArticle(article)}
+                          onDoubleClick={() => {
+                            if (article.contentType !== "folder") {
+                              setFullscreenArticle(article);
+                            }
+                          }}
                           onContextMenu={(e) => {
                             e.preventDefault();
                             setSelectedId(article.id);
@@ -742,7 +805,11 @@ export function ApprovalsManager({
                                   : "hover:bg-muted/30"
                               }`}
                               onClick={() => setSelectedId(article.id)}
-                              onDoubleClick={() => setFullscreenArticle(article)}
+                              onDoubleClick={() => {
+                                if (article.contentType !== "folder") {
+                                  setFullscreenArticle(article);
+                                }
+                              }}
                               onContextMenu={(e) => {
                                 e.preventDefault();
                                 setSelectedId(article.id);
@@ -760,14 +827,25 @@ export function ApprovalsManager({
                                     <span className="font-semibold text-xs text-foreground truncate">
                                       {hierarchy.controlName}
                                     </span>
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[9px] px-1 py-0 h-4 gap-0.5 text-muted-foreground font-mono shrink-0"
-                                      title="Click to view screen snapshot"
-                                    >
-                                      <Sparkles className="size-2.5 text-purple-500" />
-                                      Snapshot
-                                    </Badge>
+                                    {article.contentType !== "folder" ? (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[9px] px-1 py-0 h-4 gap-0.5 text-muted-foreground font-mono shrink-0"
+                                        title="Click to view screen snapshot"
+                                      >
+                                        <Sparkles className="size-2.5 text-purple-500" />
+                                        Snapshot
+                                      </Badge>
+                                    ) : (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[9px] px-1 py-0 h-4 gap-0.5 text-amber-600 border-amber-300 font-mono shrink-0 bg-amber-50/50 dark:bg-amber-950/30"
+                                        title="Directory folder"
+                                      >
+                                        <Folder className="size-2.5 text-amber-500" />
+                                        Folder
+                                      </Badge>
+                                    )}
                                   </div>
                                   <div className="text-xs text-muted-foreground truncate max-w-[240px]">
                                     {article.title}
@@ -932,12 +1010,10 @@ export function ApprovalsManager({
           <SnapshotViewer
             article={selectedArticle}
             onApprove={handleApprove}
-            onReject={(id) => {
-              const a = state.articles.find((item) => item.id === id);
-              if (a) setRejectingArticle(a);
-            }}
+            onReject={handleOpenReject}
             onExpandFullscreen={(a) => setFullscreenArticle(a)}
             canApprove={canApprove}
+            onSelectArticle={(id) => setSelectedId(id)}
           />
         </div>
       </div>
@@ -967,9 +1043,8 @@ export function ApprovalsManager({
                 setFullscreenArticle(null);
               }}
               onReject={(id) => {
-                const a = state.articles.find((item) => item.id === id);
                 setFullscreenArticle(null);
-                if (a) setRejectingArticle(a);
+                handleOpenReject(id);
               }}
               canApprove={canApprove}
             />

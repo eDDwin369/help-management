@@ -7,6 +7,7 @@ import {
   Plus,
   ArrowRight,
   ChevronRight,
+  ChevronDown,
   User,
   CheckCircle2,
   Trash2,
@@ -23,10 +24,24 @@ import {
   LayoutGrid,
   TrendingUp,
   ExternalLink,
+  Eye,
+  EyeOff,
+  Folder,
+  FileText,
+  Video,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AddWidgetModal } from "@/components/dashboard/AddWidgetModal";
+import { buildApprovedTree, type ApprovedTreeItem } from "@/lib/help-nodes";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import {
   ALL_WIDGETS,
   getWidgetGridClass,
@@ -36,7 +51,7 @@ import {
   type WidgetCategory,
   type UserWidgetState,
 } from "@/lib/widget-registry";
-import { useHmsStore } from "@/components/hms/hmsStore";
+import { useHmsStore, type HmsArticle } from "@/components/hms/hmsStore";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -360,15 +375,22 @@ export function ModernUserDashboard({
 }: {
   onOpenReview?: (articleId?: string) => void;
 } = {}) {
-  const { state } = useHmsStore();
+  const { state, archiveArticle, deleteArticle } = useHmsStore();
   const [selectedCardId, setSelectedCardId] = useState<number>(0);
   const [addWidgetOpen, setAddWidgetOpen] = useState(false);
   const [widgetToDelete, setWidgetToDelete] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [dashboardDetailArticle, setDashboardDetailArticle] = useState<HmsArticle | null>(null);
+  const [collapsedDashboardFolderIds, setCollapsedDashboardFolderIds] = useState<Set<string>>(() => new Set());
 
   const pendingArticles = useMemo(
     () => state.articles.filter((a) => a.approvalStatus === "pending"),
+    [state.articles],
+  );
+
+  const approvedArticles = useMemo(
+    () => state.articles.filter((a) => a.approvalStatus === "approved"),
     [state.articles],
   );
 
@@ -634,6 +656,192 @@ export function ModernUserDashboard({
             )}
           </div>
         );
+
+      case "approved_content": {
+        const approvedTree = buildApprovedTree(approvedArticles);
+
+        const renderDashboardTreeItem = (item: ApprovedTreeItem, depth = 0): React.ReactNode => {
+          const isFolder = item.kind === "folder" || item.kind === "subfolder";
+          const hasChildren = item.children && item.children.length > 0;
+          const isExpanded = !collapsedDashboardFolderIds.has(item.id);
+          const isHidden = item.archiveStatus === "archived";
+          const initials = (item.article?.authorName || item.node?.owner || "HA")
+            .split(" ")
+            .map((w: string) => w[0])
+            .slice(0, 2)
+            .join("")
+            .toUpperCase();
+
+          const toggleFolder = (e: React.MouseEvent) => {
+            e.stopPropagation();
+            setCollapsedDashboardFolderIds((prev) => {
+              const next = new Set(prev);
+              if (next.has(item.id)) next.delete(item.id);
+              else next.add(item.id);
+              return next;
+            });
+          };
+
+          const artForDetail = item.article || {
+            id: item.articleId,
+            title: item.name,
+            description: item.node?.description || `Approved ${item.kind}`,
+            contentType: (item.kind === "subfolder" ? "folder" : item.kind) as any,
+            contentUrl: item.node?.contentUrl || null,
+            relatedContext: "Site Recordings",
+            contexts: [],
+            approvalStatus: (item.approvalStatus || "approved") as any,
+            archiveStatus: item.archiveStatus || "active",
+            authorId: "admin",
+            authorName: item.node?.owner || "Superadmin",
+            approvedBy: "Superadmin",
+            approvedAt: new Date().toISOString(),
+            createdAt: item.node?.modified || new Date().toISOString(),
+            updatedAt: item.node?.modified || new Date().toISOString(),
+            tags: [item.kind],
+            priority: "medium" as any,
+          };
+
+          return (
+            <div key={item.id} className="space-y-1">
+              <div
+                className={`py-2 px-2 flex items-center justify-between gap-3 hover:bg-slate-50/80 dark:hover:bg-slate-800/50 rounded-xl transition-colors cursor-pointer group ${
+                  depth > 0 ? "ml-4 border-l-2 border-slate-200 dark:border-slate-700 pl-2" : ""
+                }`}
+                onClick={() => {
+                  if (isFolder) {
+                    setCollapsedDashboardFolderIds((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(item.id)) next.delete(item.id);
+                      else next.add(item.id);
+                      return next;
+                    });
+                  } else {
+                    setDashboardDetailArticle(artForDetail);
+                  }
+                }}
+              >
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  {isFolder ? (
+                    <button
+                      type="button"
+                      onClick={toggleFolder}
+                      className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors shrink-0 cursor-pointer"
+                      title={isExpanded ? "Collapse folder" : "Expand folder"}
+                    >
+                      {isExpanded ? (
+                        <ChevronDown className="size-3.5" />
+                      ) : (
+                        <ChevronRight className="size-3.5" />
+                      )}
+                    </button>
+                  ) : depth > 0 ? (
+                    <span className="w-1.5 shrink-0" />
+                  ) : null}
+
+                  <div
+                    className={`w-7 h-7 rounded-full font-bold text-xs flex items-center justify-center shrink-0 shadow-xs ${
+                      isFolder
+                        ? "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
+                        : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                    }`}
+                  >
+                    {initials}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate group-hover:text-blue-600 transition-colors flex items-center gap-1.5">
+                      <span className="truncate">{item.name}</span>
+                      {isFolder && hasChildren && (
+                        <span className="text-[10px] text-slate-400 font-normal shrink-0">
+                          ({item.children.length})
+                        </span>
+                      )}
+                      {isHidden && (
+                        <Badge className="text-[9px] px-1 py-0 h-4 bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-300 shrink-0">
+                          Hidden
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate flex items-center gap-1.5 mt-0.5">
+                      <span className="capitalize">{item.kind}</span>
+                      <span>•</span>
+                      <span>by {item.article?.authorName || item.node?.owner || "Superadmin"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Superadmin Actions: View Details, Hide, Delete */}
+                <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg cursor-pointer"
+                    title="View details"
+                    onClick={() => setDashboardDetailArticle(artForDetail)}
+                  >
+                    <Eye className="size-3.5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className={`size-7 rounded-lg cursor-pointer ${
+                      isHidden
+                        ? "text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/50"
+                        : "text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/50"
+                    }`}
+                    title={isHidden ? "Unhide for customers" : "Hide from customers"}
+                    onClick={() => {
+                      archiveArticle(item.articleId);
+                      toast.success(
+                        isHidden ? "Unhidden — live for customers" : "Hidden from customers"
+                      );
+                    }}
+                  >
+                    {isHidden ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg cursor-pointer"
+                    title="Delete content"
+                    onClick={() => {
+                      deleteArticle(item.articleId);
+                      toast.success(`Deleted "${item.name}"`);
+                    }}
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Nested Children (Folder -> Subfolder -> Content) */}
+              {isFolder && isExpanded && hasChildren && (
+                <div className="space-y-1 mt-1">
+                  {item.children.map((child) => renderDashboardTreeItem(child, depth + 1))}
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        return (
+          <div className="flex-1 flex flex-col justify-between py-1 overflow-hidden">
+            {approvedTree.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground flex flex-col items-center justify-center gap-2">
+                <CheckCircle2 className="size-8 text-emerald-500" />
+                <span className="font-semibold text-slate-700 dark:text-slate-200">
+                  No approved content yet
+                </span>
+                <span className="text-[11px]">Approved folders and guides will appear here.</span>
+              </div>
+            ) : (
+              <div className="space-y-1 overflow-y-auto max-h-[260px] pr-1 divide-y divide-slate-100 dark:divide-slate-800">
+                {approvedTree.map((item) => renderDashboardTreeItem(item, 0))}
+              </div>
+            )}
+          </div>
+        );
+      }
 
       case "missing_areas":
         return (
@@ -947,6 +1155,150 @@ export function ModernUserDashboard({
           })}
         </div>
       )}
+
+      {/* Superadmin View Details Modal */}
+      <Dialog
+        open={Boolean(dashboardDetailArticle)}
+        onOpenChange={(open) => !open && setDashboardDetailArticle(null)}
+      >
+        <DialogContent className="max-w-lg bg-card text-foreground border rounded-2xl p-5 shadow-2xl">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="capitalize text-[10px]">
+                {dashboardDetailArticle?.contentType}
+              </Badge>
+              <Badge className="text-[10px] bg-emerald-500/20 text-emerald-600 border-emerald-500/40">
+                Approved
+              </Badge>
+              {dashboardDetailArticle?.archiveStatus === "archived" && (
+                <Badge className="text-[10px] bg-amber-500/20 text-amber-700 border-amber-500/40">
+                  Hidden
+                </Badge>
+              )}
+            </div>
+            <DialogTitle className="text-base font-semibold pt-1">
+              {dashboardDetailArticle?.title}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              {dashboardDetailArticle?.description || "Approved content resource"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Media / Preview Content */}
+          <div className="rounded-xl border bg-muted/30 p-3 space-y-2 text-xs">
+            {dashboardDetailArticle?.contentType === "image" && dashboardDetailArticle.contentUrl && (
+              <div className="rounded-lg overflow-hidden max-h-56 flex items-center justify-center bg-black/40">
+                <img
+                  src={dashboardDetailArticle.contentUrl}
+                  alt={dashboardDetailArticle.title}
+                  className="max-h-56 object-contain"
+                />
+              </div>
+            )}
+            {dashboardDetailArticle?.contentType === "video" && dashboardDetailArticle.contentUrl && (
+              <video
+                src={dashboardDetailArticle.contentUrl}
+                controls
+                className="w-full rounded-lg max-h-56 object-contain"
+              />
+            )}
+            {dashboardDetailArticle?.contentType === "pdf" && (
+              <div className="p-3 rounded-lg bg-card border flex items-center gap-2 text-xs">
+                <FileText className="size-5 text-amber-500" />
+                <span>PDF Document attached: {dashboardDetailArticle.title}</span>
+              </div>
+            )}
+            {dashboardDetailArticle?.contentType === "folder" && (
+              <div className="p-3 rounded-lg bg-card border space-y-1.5">
+                <div className="font-semibold flex items-center gap-1.5">
+                  <Folder className="size-4 text-amber-500" />
+                  <span>Approved Folder</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Folder is live and visible in the customer help library.
+                </p>
+              </div>
+            )}
+            {dashboardDetailArticle?.contentType === "text" && (
+              <div className="p-2 text-xs whitespace-pre-wrap max-h-48 overflow-y-auto">
+                {dashboardDetailArticle.contentUrl || dashboardDetailArticle.description}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t text-[11px] text-muted-foreground">
+              <div>
+                <span className="font-medium text-foreground">Author:</span> {dashboardDetailArticle?.authorName}
+              </div>
+              <div>
+                <span className="font-medium text-foreground">Updated:</span>{" "}
+                {dashboardDetailArticle?.updatedAt
+                  ? new Date(dashboardDetailArticle.updatedAt).toLocaleDateString()
+                  : "Recently"}
+              </div>
+              <div>
+                <span className="font-medium text-foreground">Page:</span>{" "}
+                {dashboardDetailArticle?.hierarchy?.pageName || "Site Recordings"}
+              </div>
+              <div>
+                <span className="font-medium text-foreground">Card:</span>{" "}
+                {dashboardDetailArticle?.hierarchy?.cardName || "Drawings"}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-2 border-t">
+            <Button
+              size="sm"
+              variant="destructive"
+              className="h-8 gap-1.5 text-xs cursor-pointer"
+              onClick={() => {
+                if (dashboardDetailArticle) {
+                  deleteArticle(dashboardDetailArticle.id);
+                  toast.success(`Deleted "${dashboardDetailArticle.title}"`);
+                  setDashboardDetailArticle(null);
+                }
+              }}
+            >
+              <Trash2 className="size-3.5" /> Delete Content
+            </Button>
+
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1.5 text-xs cursor-pointer"
+                onClick={() => {
+                  if (dashboardDetailArticle) {
+                    archiveArticle(dashboardDetailArticle.id);
+                    const nowHidden = dashboardDetailArticle.archiveStatus === "active";
+                    toast.success(nowHidden ? "Hidden from customers" : "Unhidden — live for customers");
+                    setDashboardDetailArticle((prev) =>
+                      prev ? { ...prev, archiveStatus: nowHidden ? "archived" : "active" } : null
+                    );
+                  }
+                }}
+              >
+                {dashboardDetailArticle?.archiveStatus === "archived" ? (
+                  <>
+                    <Eye className="size-3.5 text-emerald-600" /> Unhide
+                  </>
+                ) : (
+                  <>
+                    <EyeOff className="size-3.5 text-amber-600" /> Hide from Customers
+                  </>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                className="h-8 text-xs cursor-pointer"
+                onClick={() => setDashboardDetailArticle(null)}
+              >
+                Done
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog

@@ -18,6 +18,7 @@ import {
   labelForContext,
 } from "@/lib/hms-context-registry";
 import { ARTICLE_MEDIA, bodyForArticle, type ArticleSection } from "@/lib/help-content";
+import { syncNodeApprovalStatus, deleteNodeById, toggleHideNode } from "@/lib/help-nodes";
 
 export type ContentType = "video" | "pdf" | "image" | "text" | "folder";
 export type ApprovalStatus = "approved" | "pending" | "unapproved" | "rejected";
@@ -579,87 +580,6 @@ const SEED_ARTICLES: HmsArticle[] = [
     sizeBytes: 540_000,
   }),
   article({
-    id: "folder-001",
-    title: "Site Patrol Onboarding & Checklists",
-    description: "Standard operating procedures, emergency drone patrol protocols, and technician check-in checklists.",
-    contentType: "folder",
-    contentUrl: null,
-    contexts: ["app-tab-site-patrol", "section-site-patrol"],
-    approvalStatus: "pending",
-    archiveStatus: "active",
-    authorId: "sub_admin",
-    authorName: "Sam HelpAdmin",
-    approvedBy: null,
-    approvedAt: null,
-    createdAt: "2026-09-18T14:30:00Z",
-    updatedAt: "2026-09-18T14:30:00Z",
-    tags: ["folder", "site-patrol", "onboarding"],
-    priority: "high",
-    folderChildren: [
-      { id: "fc-1", name: "Drone Pre-Flight Safety Checklist.pdf", type: "pdf", size: "1.4 MB", approvalStatus: "pending" },
-      { id: "fc-2", name: "Technician Patrol Protocol Video.mp4", type: "video", size: "8.2 MB", approvalStatus: "pending" },
-      { id: "fc-3", name: "Emergency Contact Matrix.pdf", type: "pdf", size: "420 KB", approvalStatus: "approved" },
-    ],
-  }),
-  article({
-    id: "art-027",
-    title: "Level 2 Drone Patrol Video Demonstration",
-    description: "Inspection flight path walkthrough and live obstacle avoidance sensor calibration.",
-    contentType: "video",
-    contentUrl: "/images/drawing-videos.png",
-    contexts: ["section-drawing-videos", "drawing-videos-player"],
-    approvalStatus: "pending",
-    archiveStatus: "active",
-    authorId: "sub_admin",
-    authorName: "Alex HelpAdmin",
-    approvedBy: null,
-    approvedAt: null,
-    createdAt: "2026-09-18T16:15:00Z",
-    updatedAt: "2026-09-18T16:15:00Z",
-    tags: ["video", "drone", "inspection"],
-    priority: "high",
-    sizeBytes: 14_200_000,
-  }),
-  article({
-    id: "art-028",
-    title: "Safety Equipment & Sensor Specs Sheet",
-    description: "Comprehensive sensor sensitivity specifications, operating temperatures, and battery guidelines.",
-    contentType: "pdf",
-    contentUrl: null,
-    contexts: ["site-recordings-table", "site-recordings-breadcrumb"],
-    approvalStatus: "pending",
-    archiveStatus: "active",
-    authorId: "sub_admin",
-    authorName: "Sam HelpAdmin",
-    approvedBy: null,
-    approvedAt: null,
-    createdAt: "2026-09-18T17:40:00Z",
-    updatedAt: "2026-09-18T17:40:00Z",
-    tags: ["safety", "specs", "pdf"],
-    priority: "medium",
-    pages: 4,
-    sizeBytes: 3_800_000,
-  }),
-  article({
-    id: "art-029",
-    title: "360 Spatial Zone Layout & Camera Grid",
-    description: "Floor plan diagram overlaying all 14 fixed HD cameras and motion sensor tripwires.",
-    contentType: "image",
-    contentUrl: "/images/site-recordings.png",
-    contexts: ["site-recordings-table", "site-recordings-col-pin"],
-    approvalStatus: "pending",
-    archiveStatus: "active",
-    authorId: "sub_admin",
-    authorName: "Elena HelpAdmin",
-    approvedBy: null,
-    approvedAt: null,
-    createdAt: "2026-09-18T18:05:00Z",
-    updatedAt: "2026-09-18T18:05:00Z",
-    tags: ["diagram", "360", "cameras"],
-    priority: "low",
-    sizeBytes: 1_250_000,
-  }),
-  article({
     id: "art-030",
     title: "Legacy Camera Configuration v1",
     description: "Legacy analog configuration document for previous generation camera hubs.",
@@ -736,22 +656,25 @@ const DEFAULT_STATE: HmsState = {
   notifications: { customer: 0, helpAdmin: 0, admin: 0 },
 };
 
-const STORAGE_KEY = "hmsStore.v5";
+const STORAGE_KEY = "hmsStore.v6";
 
 function loadPersistedState(): HmsState {
   if (typeof window === "undefined") return DEFAULT_STATE;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(STORAGE_KEY) || window.localStorage.getItem("hmsStore.v5");
     if (!raw) return DEFAULT_STATE;
     const parsed = JSON.parse(raw) as Partial<HmsState>;
     if (!Array.isArray(parsed.articles) || !Array.isArray(parsed.tickets)) return DEFAULT_STATE;
+    const DUMMY_IDS = new Set(["folder-001", "art-027", "art-028", "art-029"]);
     return {
-      articles: parsed.articles.map((a) => ({
-        ...a,
-        contexts: a.contexts ?? [],
-        contentUrl: a.contentUrl ?? ARTICLE_MEDIA[a.id] ?? null,
-        body: a.body ?? bodyForArticle(a.id),
-      })),
+      articles: parsed.articles
+        .filter((a) => !DUMMY_IDS.has(a.id))
+        .map((a) => ({
+          ...a,
+          contexts: a.contexts ?? [],
+          contentUrl: a.contentUrl ?? ARTICLE_MEDIA[a.id] ?? null,
+          body: a.body ?? bodyForArticle(a.id),
+        })),
       tickets: parsed.tickets,
       notifications: parsed.notifications ?? DEFAULT_STATE.notifications,
     };
@@ -792,42 +715,123 @@ function reducer(state: HmsState, action: Action): HmsState {
           a.id === action.id ? { ...a, ...action.fields, updatedAt: now } : a,
         ),
       };
-    case "APPROVE_ARTICLE":
+    case "APPROVE_ARTICLE": {
+      const target = state.articles.find(
+        (a) =>
+          a.id === action.id ||
+          a.id === `art-${action.id}` ||
+          a.id === `folder-${action.id}` ||
+          a.title.toLowerCase() === action.id.toLowerCase()
+      );
+      const isFolder = target?.contentType === "folder";
+      const folderTitle = target?.title.toLowerCase();
+
+      // Sync to HelpAdmin nodes storage
+      syncNodeApprovalStatus(action.id, "approved", undefined, action.adminName, target?.title);
+
       return {
         ...state,
-        articles: state.articles.map((a) =>
-          a.id === action.id
-            ? {
-                ...a,
-                approvalStatus: "approved",
-                approvedBy: action.adminName,
-                approvedAt: now,
-                updatedAt: now,
-              }
-            : a,
-        ),
+        articles: state.articles.map((a) => {
+          const isTarget =
+            a.id === action.id ||
+            a.id === `art-${action.id}` ||
+            a.id === `folder-${action.id}` ||
+            (target && a.id === target.id);
+
+          if (isTarget) {
+            return {
+              ...a,
+              approvalStatus: "approved",
+              approvedBy: action.adminName,
+              approvedAt: now,
+              updatedAt: now,
+            };
+          }
+
+          // If a folder was approved, approve pending child contents inside it
+          if (
+            isFolder &&
+            folderTitle &&
+            a.hierarchy?.cardName?.toLowerCase() === folderTitle &&
+            a.approvalStatus !== "rejected" &&
+            a.approvalStatus !== "unapproved"
+          ) {
+            return {
+              ...a,
+              approvalStatus: "approved",
+              approvedBy: action.adminName,
+              approvedAt: now,
+              updatedAt: now,
+            };
+          }
+
+          return a;
+        }),
         notifications: {
           ...state.notifications,
           customer: state.notifications.customer + 1,
         },
       };
-    case "UNAPPROVE_ARTICLE":
+    }
+    case "UNAPPROVE_ARTICLE": {
+      const target = state.articles.find(
+        (a) =>
+          a.id === action.id ||
+          a.id === `art-${action.id}` ||
+          a.id === `folder-${action.id}` ||
+          a.title.toLowerCase() === action.id.toLowerCase()
+      );
+      const isFolder = target?.contentType === "folder";
+      const folderTitle = target?.title.toLowerCase();
+
+      // Sync to HelpAdmin nodes storage
+      syncNodeApprovalStatus(action.id, "rejected", action.reason, action.adminName, target?.title);
+
       return {
         ...state,
-        articles: state.articles.map((a) =>
-          a.id === action.id
-            ? {
-                ...a,
-                approvalStatus: "unapproved",
-                rejectionReason: action.reason || a.rejectionReason || "Does not follow guidelines",
-                rejectedBy: action.adminName || "Jordan Admin",
-                rejectedAt: now,
-                updatedAt: now,
-              }
-            : a,
-        ),
+        articles: state.articles.map((a) => {
+          const isTarget =
+            a.id === action.id ||
+            a.id === `art-${action.id}` ||
+            a.id === `folder-${action.id}` ||
+            (target && a.id === target.id);
+
+          if (isTarget) {
+            return {
+              ...a,
+              approvalStatus: "unapproved",
+              rejectionReason: action.reason || a.rejectionReason || "Does not follow guidelines",
+              rejectedBy: action.adminName || "Jordan Admin",
+              rejectedAt: now,
+              updatedAt: now,
+            };
+          }
+
+          // If a folder was rejected, reject all contents inside it
+          if (
+            isFolder &&
+            folderTitle &&
+            a.hierarchy?.cardName?.toLowerCase() === folderTitle
+          ) {
+            return {
+              ...a,
+              approvalStatus: "unapproved",
+              rejectionReason: action.reason || a.rejectionReason || "Folder rejected by Superadmin",
+              rejectedBy: action.adminName || "Jordan Admin",
+              rejectedAt: now,
+              updatedAt: now,
+            };
+          }
+
+          return a;
+        }),
       };
-    case "ARCHIVE_ARTICLE":
+    }
+    case "ARCHIVE_ARTICLE": {
+      const target = state.articles.find((a) => a.id === action.id);
+      const willBeArchived = target ? target.archiveStatus === "active" : true;
+      toggleHideNode(action.id, willBeArchived);
+
       return {
         ...state,
         articles: state.articles.map((a) =>
@@ -840,8 +844,11 @@ function reducer(state: HmsState, action: Action): HmsState {
             : a,
         ),
       };
-    case "DELETE_ARTICLE":
+    }
+    case "DELETE_ARTICLE": {
+      deleteNodeById(action.id);
       return { ...state, articles: state.articles.filter((a) => a.id !== action.id) };
+    }
     case "SUBMIT_TICKET":
       return {
         ...state,
@@ -1104,8 +1111,22 @@ export function getFilteredArticles(
   const q = searchQuery.trim().toLowerCase();
   return articles.filter((a) => {
     if (role === "customer") {
-      if (a.approvalStatus !== "approved") return false;
       if (a.archiveStatus !== "active") return false;
+      if (a.contentType === "folder") {
+        const isSelfApproved = a.approvalStatus === "approved";
+        const hasApprovedContent = articles.some(
+          (c) =>
+            c.id !== a.id &&
+            c.hierarchy?.cardName?.toLowerCase() === a.title.toLowerCase() &&
+            c.approvalStatus === "approved"
+        );
+        if (!isSelfApproved && !hasApprovedContent) return false;
+        if (a.approvalStatus === "rejected" || a.approvalStatus === "unapproved") {
+          if (!hasApprovedContent) return false;
+        }
+      } else {
+        if (a.approvalStatus !== "approved") return false;
+      }
     }
     if (!matchesContext(a, contextKey)) return false;
     const types = filters.types ?? [];

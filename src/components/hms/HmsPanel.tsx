@@ -53,6 +53,7 @@ import {
   type UserRole,
 } from "./hmsStore";
 import { trackHmsEvent } from "@/lib/hms-analytics";
+import { HelpNodeTreeView } from "@/components/help/HelpNodeTreeView";
 
 const NAVY = "#102040";
 
@@ -1181,7 +1182,13 @@ function AiChatView({
 }) {
   const { state, context } = useHmsStore();
   const [messages, setMessages] = useState<
-    Array<{ id: string; sender: "user" | "ai"; text: string; articles?: typeof state.articles }>
+    Array<{
+      id: string;
+      sender: "user" | "ai";
+      text: string;
+      articles?: typeof state.articles;
+      showFileStructures?: boolean;
+    }>
   >([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -1220,11 +1227,7 @@ function AiChatView({
           `• Overview: 27 active video recordings & 360° patrol sessions captured across Level 2 (KL-Ar-L2 Zone).\n` +
           `• Key Session: Latest entry "structure-plan-1-may-26-19-34-18.mp4" recorded in 1920x960 HD resolution.\n` +
           `• Activity Log: 14 recent recordings captured with timestamped spatial annotations & motion tracking.\n` +
-          `• Operational Status: All session logs synced & archived. 2 pending inspection items awaiting review.\n\n` +
-          `💡 Recommended Follow-up Actions:\n` +
-          `1. Would you like to filter Site Recordings by date range or zone?\n` +
-          `2. Would you like to inspect timestamp breakdowns or motion events?\n` +
-          `3. Would you like to export raw MP4 video logs or reports?`;
+          `• Operational Status: All session logs synced & archived. 2 pending inspection items awaiting review.`;
       } else if (query.includes("talk")) {
         aiText = `Sure, let's talk about Site Recordings. What would you like to know?\n\n` +
           `You can ask me about:\n` +
@@ -1273,6 +1276,9 @@ function AiChatView({
           `• Help Articles: Browse related guides below or use the search bar to locate specific operational procedures.`;
       }
 
+      const isSummary =
+        query.includes("present") || query.includes("summary") || query.includes("summarize");
+
       setMessages((prev) => [
         ...prev,
         {
@@ -1280,6 +1286,7 @@ function AiChatView({
           sender: "ai" as const,
           text: aiText,
           articles: matched.length > 0 ? matched.slice(0, 3) : state.articles.slice(0, 2),
+          showFileStructures: isSummary,
         },
       ]);
       setIsTyping(false);
@@ -1370,7 +1377,9 @@ function AiChatView({
             className={`flex flex-col ${m.sender === "user" ? "items-end" : "items-start"}`}
           >
             <div
-              className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed shadow-xs ${
+              className={`${
+                m.showFileStructures ? "max-w-[96%] w-full" : "max-w-[85%]"
+              } rounded-2xl px-3.5 py-2 text-xs leading-relaxed shadow-xs ${
                 m.sender === "user"
                   ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-br-xs"
                   : "bg-gray-50 text-gray-800 border border-gray-200 rounded-bl-xs"
@@ -1384,21 +1393,13 @@ function AiChatView({
               )}
               <p className="whitespace-pre-line">{m.text}</p>
 
-              {m.articles && m.articles.length > 0 && (
-                <div className="mt-2.5 pt-2 border-t border-gray-200 space-y-1.5">
-                  <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider block">
-                    Recommended Articles
-                  </span>
-                  {m.articles.map((art) => (
-                    <button
-                      key={art.id}
-                      onClick={() => onOpenArticle(art.id)}
-                      className="w-full text-left p-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-900 transition-colors flex items-center justify-between gap-1 group"
-                    >
-                      <span className="truncate font-medium text-[11px]">{art.title}</span>
-                      <ChevronRight className="size-3 text-purple-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
-                    </button>
-                  ))}
+              {m.showFileStructures && (
+                <div className="mt-3 pt-2.5 border-t border-gray-200">
+                  <div className="text-[11px] font-bold text-gray-800 mb-1.5 flex items-center gap-1.5">
+                    <Folder className="size-3.5 text-amber-500" />
+                    <span>File Structures as in Help Admin:</span>
+                  </div>
+                  <HelpNodeTreeView compact showSearch={true} />
                 </div>
               )}
             </div>
@@ -2950,6 +2951,10 @@ export function HmsPanel() {
         x: Math.max(10, Math.floor((window.innerWidth - fixedW) / 2)),
         y: Math.max(10, Math.floor((window.innerHeight - fixedH) / 2)),
       });
+    } else if (view.name === "ai-chat") {
+      const fixedW = Math.min(380, window.innerWidth - 32);
+      const fixedH = Math.min(580, window.innerHeight - 40);
+      setSize({ width: fixedW, height: fixedH });
     } else {
       setSize({ width: 320, height: 530 });
       if (userPosRef.current) {

@@ -168,15 +168,30 @@ function repairNodeContent(node: HelpAdminNode): HelpAdminNode {
   return updated;
 }
 
+import { DEFAULT_STARTER_NODES } from "@/lib/help-nodes";
+
 function loadSavedNodes(): HelpAdminNode[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === "undefined") return DEFAULT_STARTER_NODES;
   try {
     const saved = localStorage.getItem(LOCAL_STORAGE_NODES_KEY);
-    const parsed: HelpAdminNode[] = saved ? JSON.parse(saved) : [];
-    return deduplicateNodes(parsed.map(repairNodeContent));
+    if (!saved) {
+      localStorage.setItem(LOCAL_STORAGE_NODES_KEY, JSON.stringify(DEFAULT_STARTER_NODES));
+      return DEFAULT_STARTER_NODES;
+    }
+    const parsed: HelpAdminNode[] = JSON.parse(saved);
+    if (!parsed || parsed.length === 0) {
+      localStorage.setItem(LOCAL_STORAGE_NODES_KEY, JSON.stringify(DEFAULT_STARTER_NODES));
+      return DEFAULT_STARTER_NODES;
+    }
+    const hasTestFlow = parsed.some((n) => n.name.toLowerCase() === "test flow");
+    let combined = parsed;
+    if (!hasTestFlow) {
+      combined = [...DEFAULT_STARTER_NODES, ...parsed];
+    }
+    return deduplicateNodes(combined.map(repairNodeContent));
   } catch (e) {
     console.error("Failed to load saved help admin nodes:", e);
-    return [];
+    return DEFAULT_STARTER_NODES;
   }
 }
 
@@ -352,6 +367,7 @@ export function HelpAdminRightClickModal() {
     if (typeof window === "undefined") return;
     try {
       localStorage.setItem(LOCAL_STORAGE_NODES_KEY, JSON.stringify(nodes));
+      window.dispatchEvent(new CustomEvent("hms_nodes_updated", { detail: nodes }));
     } catch (e) {
       console.error("Failed to persist help admin nodes:", e);
     }
@@ -1359,26 +1375,32 @@ export function HelpAdminRightClickModal() {
         {/* Tree Container / Main List Area */}
         <div className="flex-1 min-h-[160px] overflow-y-auto bg-white dark:bg-card divide-y divide-border/30 custom-scrollbar">
           {nodes.length === 0 ? (
-            /* Requirement 1 & 3: Initially Empty with Info & Hover Tooltip */
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div
-                  onClick={() => openAddModal(null)}
-                  className="py-12 px-4 text-center cursor-pointer group transition-colors hover:bg-blue-50/50 dark:hover:bg-blue-950/20"
-                >
-                  <div className="h-10 w-10 mx-auto rounded-full bg-blue-100 dark:bg-blue-950/50 text-blue-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                    <Info className="h-5 w-5" />
-                  </div>
-                  <h5 className="text-xs font-bold text-foreground">No Help Folders</h5>
-                  <p className="text-[11px] text-muted-foreground mt-1 max-w-[220px] mx-auto">
-                    Initially empty. Click the <span className="font-semibold text-blue-600">+</span> button to create a folder.
-                  </p>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs bg-slate-900 text-white font-bold">
-                Click + to create folder
-              </TooltipContent>
-            </Tooltip>
+            <div
+              onClick={() => openAddModal(null)}
+              className="py-12 px-4 text-center cursor-pointer group transition-colors hover:bg-blue-50/50 dark:hover:bg-blue-950/20"
+            >
+              <div className="h-10 w-10 mx-auto rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                <Folder className="h-5 w-5 fill-amber-500/20" />
+              </div>
+              <div className="inline-flex items-center justify-center gap-1.5">
+                <h5 className="text-xs font-bold text-foreground">No Help Folders</h5>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center justify-center text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 transition-colors cursor-pointer p-0.5 rounded focus:outline-none"
+                      aria-label="Folder creation info"
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs max-w-[240px] text-center bg-slate-900 text-white font-medium p-2 shadow-lg">
+                    Initially empty. Click the <span className="font-semibold text-blue-400">+</span> button to create a folder.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
           ) : filteredNodes.length === 0 ? (
             <div className="py-10 text-center text-xs text-muted-foreground">
               No matching folders or items found.

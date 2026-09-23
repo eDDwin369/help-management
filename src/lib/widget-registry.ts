@@ -77,6 +77,15 @@ export const ALL_WIDGETS: WidgetConfig[] = [
     allowedRoles: ["admin", "sub_admin", "customer"],
   },
   {
+    id: "approved_content",
+    title: "Approved Content",
+    description: "Live approved folders, guides, and documentation media",
+    icon: CheckCircle2,
+    defaultWidth: "full",
+    category: "for_review",
+    allowedRoles: ["admin", "sub_admin", "customer"],
+  },
+  {
     id: "missing_areas",
     title: "Areas Without Help",
     description: "High priority gaps requiring documentation",
@@ -142,8 +151,9 @@ export const ALL_WIDGETS: WidgetConfig[] = [
 ];
 
 const DEFAULT_WIDGET_ORDER: UserWidgetState[] = [
-  { id: "help_approvals", width: "two-thirds", order: 0 },
-  { id: "live_activity", width: "third", order: 1 },
+  { id: "help_approvals", width: "half", order: 0 },
+  { id: "approved_content", width: "half", order: 1 },
+  { id: "live_activity", width: "third", order: 2 },
 ];
 
 /** Get all widgets allowed for a user's role based on permission rules. */
