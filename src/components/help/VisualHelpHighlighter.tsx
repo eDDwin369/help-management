@@ -24,6 +24,7 @@ import {
   Folder,
   ChevronDown,
   ChevronRight,
+  ArrowLeft,
 } from "lucide-react";
 import { buildApprovedTree, getSectionFromContext, type ApprovedTreeItem } from "@/lib/help-nodes";
 
@@ -41,7 +42,15 @@ export function VisualHelpHighlighter() {
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [detailItem, setDetailItem] = useState<HmsArticle | null>(null);
+  const [savedActiveKey, setSavedActiveKey] = useState<string | null>(null);
   const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(() => new Set());
+
+  const handleBack = () => {
+    setDetailItem(null);
+    if (savedActiveKey) {
+      setActiveKey(savedActiveKey);
+    }
+  };
 
   // Direct DOM style mutation on rAF to bypass React render cycle latency & track 60fps synchronously
   useEffect(() => {
@@ -131,12 +140,15 @@ export function VisualHelpHighlighter() {
     };
   }, [locations]);
 
-  // Close active popover when clicking outside, but preserve when right-clicking or interacting with white panels
+  // Close active popover when clicking outside, but preserve when right-clicking or interacting with white panels or detail modal
   useEffect(() => {
     if (!activeKey) return;
     const handleClickOutside = (e: MouseEvent) => {
       // Never close the black modal on right-click (contextmenu / button === 2)
       if (e.button === 2) return;
+
+      // Keep open if the detail modal is active
+      if (detailItem) return;
 
       const target = e.target as HTMLElement | null;
       if (!target) return;
@@ -164,7 +176,7 @@ export function VisualHelpHighlighter() {
     };
     document.addEventListener("pointerdown", handleClickOutside);
     return () => document.removeEventListener("pointerdown", handleClickOutside);
-  }, [activeKey]);
+  }, [activeKey, detailItem]);
 
   const renderApprovedItem = (
     item: ApprovedTreeItem,
@@ -199,10 +211,8 @@ export function VisualHelpHighlighter() {
           return next;
         });
       } else {
-        setContext(contextKey, label);
-        requestPanelView({ type: "article", id: item.articleId });
-        openPanel();
-        setActiveKey(null);
+        setSavedActiveKey(activeKey || contextKey);
+        setDetailItem(artForDetail);
       }
     };
 
@@ -275,21 +285,11 @@ export function VisualHelpHighlighter() {
             )}
           </div>
 
-          {/* Superadmin Actions: View Details, Hide, Delete */}
+          {/* Superadmin Actions: Hide/Unhide, Delete */}
           <div
             className="flex items-center gap-0.5 shrink-0 ml-1.5"
             onClick={(e) => e.stopPropagation()}
           >
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-6 text-slate-400 hover:text-white hover:bg-slate-700/80 rounded cursor-pointer"
-              title="View details"
-              onClick={() => setDetailItem(artForDetail)}
-            >
-              <Eye className="size-3.5" />
-            </Button>
-
             <Button
               size="icon"
               variant="ghost"
@@ -298,7 +298,7 @@ export function VisualHelpHighlighter() {
                   ? "text-amber-400 hover:text-amber-300 hover:bg-amber-950/50"
                   : "text-slate-400 hover:text-amber-300 hover:bg-slate-700/80"
               }`}
-              title={isHidden ? "Unhide for customers" : "Hide from customers"}
+              title={isHidden ? "Content hidden — click to make visible" : "Content visible — click to hide"}
               onClick={() => {
                 archiveArticle(item.articleId);
                 toast.success(
@@ -306,7 +306,7 @@ export function VisualHelpHighlighter() {
                 );
               }}
             >
-              {isHidden ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
+              {isHidden ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
             </Button>
 
             <Button
@@ -534,21 +534,44 @@ export function VisualHelpHighlighter() {
       })}
 
       {/* Superadmin View Details Modal */}
-      <Dialog open={Boolean(detailItem)} onOpenChange={(o) => !o && setDetailItem(null)}>
-        <DialogContent className="max-w-lg bg-slate-950 text-slate-100 border-slate-800 shadow-2xl">
+      <Dialog
+        open={Boolean(detailItem)}
+        onOpenChange={(o) => {
+          if (!o) {
+            handleBack();
+          }
+        }}
+      >
+        <DialogContent
+          overlayClassName="z-[100001]"
+          overlayStyle={{ zIndex: 100001 }}
+          style={{ zIndex: 100002 }}
+          className="max-w-lg bg-slate-950 text-slate-100 border-slate-800 shadow-2xl z-[100002]"
+        >
           <DialogHeader>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="capitalize text-[10px] text-indigo-300 border-indigo-500/40 bg-indigo-500/10">
-                {detailItem?.contentType}
-              </Badge>
-              <Badge className="text-[10px] bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
-                Approved
-              </Badge>
-              {detailItem?.archiveStatus === "archived" && (
-                <Badge className="text-[10px] bg-amber-500/20 text-amber-300 border-amber-500/40">
-                  Hidden
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg gap-1 -ml-1 cursor-pointer"
+                  onClick={handleBack}
+                >
+                  <ArrowLeft className="size-3.5" /> Back
+                </Button>
+                <div className="h-3.5 w-px bg-slate-800" />
+                <Badge variant="outline" className="capitalize text-[10px] text-indigo-300 border-indigo-500/40 bg-indigo-500/10">
+                  {detailItem?.contentType}
                 </Badge>
-              )}
+                <Badge className="text-[10px] bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
+                  Approved
+                </Badge>
+                {detailItem?.archiveStatus === "archived" && (
+                  <Badge className="text-[10px] bg-amber-500/20 text-amber-300 border-amber-500/40">
+                    Hidden
+                  </Badge>
+                )}
+              </div>
             </div>
             <DialogTitle className="text-base font-semibold text-white pt-1">
               {detailItem?.title}
@@ -608,7 +631,7 @@ export function VisualHelpHighlighter() {
                 if (detailItem) {
                   deleteArticle(detailItem.id);
                   toast.success(`Deleted "${detailItem.title}"`);
-                  setDetailItem(null);
+                  handleBack();
                 }
               }}
             >
@@ -643,10 +666,10 @@ export function VisualHelpHighlighter() {
               </Button>
               <Button
                 size="sm"
-                className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
-                onClick={() => setDetailItem(null)}
+                className="h-8 text-xs bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer gap-1.5"
+                onClick={handleBack}
               >
-                Done
+                <ArrowLeft className="size-3.5" /> Back
               </Button>
             </div>
           </div>

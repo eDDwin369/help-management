@@ -775,21 +775,12 @@ export function ModernUserDashboard({
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="size-7 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg cursor-pointer"
-                    title="View details"
-                    onClick={() => setDashboardDetailArticle(artForDetail)}
-                  >
-                    <Eye className="size-3.5" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
                     className={`size-7 rounded-lg cursor-pointer ${
                       isHidden
                         ? "text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/50"
                         : "text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/50"
                     }`}
-                    title={isHidden ? "Unhide for customers" : "Hide from customers"}
+                    title={isHidden ? "Content hidden — click to make visible" : "Content visible — click to hide"}
                     onClick={() => {
                       archiveArticle(item.articleId);
                       toast.success(
@@ -797,7 +788,7 @@ export function ModernUserDashboard({
                       );
                     }}
                   >
-                    {isHidden ? <Eye className="size-3.5" /> : <EyeOff className="size-3.5" />}
+                    {isHidden ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                   </Button>
                   <Button
                     size="icon"
