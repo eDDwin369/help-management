@@ -10,6 +10,7 @@ import { useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-context";
 import { useHmsStore, type HmsArticle } from "@/components/hms/hmsStore";
 import { labelForContext, CONTEXT_ARTICLE_MAP } from "@/lib/hms-context-registry";
+import { getSectionFromContext } from "@/lib/help-nodes";
 
 export type InspectorMode = "visual" | "right-click" | "report";
 
@@ -77,8 +78,9 @@ export function HelpInspectorProvider({ children }: { children: ReactNode }) {
       const key = el.getAttribute("data-hms-context");
       if (!key) return;
 
-      // Exclude sidebar elements from help inspector scanning
+      // Exclude sidebar elements and massive outer tab panel wrappers from cluttering highlighter
       if (el.closest("aside, .sidebar, [data-sidebar]")) return;
+      if (el.hasAttribute("data-dashboard-tab")) return;
 
       // Ensure element is visible
       const rect = el.getBoundingClientRect();
@@ -98,13 +100,45 @@ export function HelpInspectorProvider({ children }: { children: ReactNode }) {
       // Find all articles attached to this contextKey
       const articleIds = CONTEXT_ARTICLE_MAP[contextKey] ?? [];
 
+      const sec = getSectionFromContext(contextKey, label);
+      const isTabOrSection =
+        contextKey.startsWith("app-tab-") ||
+        contextKey.startsWith("section-") ||
+        contextKey.startsWith("app-nav-");
+
       // Filter state.articles for matching articles
-      const matchingArticles = hmsState.articles.filter(
-        (a) =>
-          a.archiveStatus === "active" &&
-          a.approvalStatus === "approved" &&
-          (a.contexts.includes(contextKey) || articleIds.includes(a.id))
-      );
+      const matchingArticles = hmsState.articles.filter((a) => {
+        if (a.archiveStatus !== "active" || a.approvalStatus !== "approved") {
+          return false;
+        }
+
+        // 1. Direct context match
+        if (a.contexts && a.contexts.includes(contextKey)) return true;
+
+        // 2. Static registry match
+        if (articleIds.includes(a.id)) return true;
+
+        // 3. Section/Tab matching: if location is a tab or section, match any approved article in this section
+        if (isTabOrSection) {
+          const artPage = (a.hierarchy?.pageName || "").toLowerCase().trim();
+          const secLabel = sec.sectionLabel.toLowerCase().trim();
+          if (artPage && artPage === secLabel) return true;
+
+          // Check if relatedContext starts with section label
+          if (a.relatedContext && a.relatedContext.toLowerCase().startsWith(secLabel)) return true;
+
+          // Check if article contexts contain the section key or tab key
+          if (
+            a.contexts &&
+            (a.contexts.includes(sec.sectionKey) ||
+              a.contexts.some((c) => c.includes(sec.sectionKey.replace("section-", ""))))
+          ) {
+            return true;
+          }
+        }
+
+        return false;
+      });
 
       parsedLocations.push({
         contextKey,

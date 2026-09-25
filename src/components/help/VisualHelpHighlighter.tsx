@@ -25,7 +25,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
-import { buildApprovedTree, type ApprovedTreeItem } from "@/lib/help-nodes";
+import { buildApprovedTree, getSectionFromContext, type ApprovedTreeItem } from "@/lib/help-nodes";
 
 export function VisualHelpHighlighter() {
   const { isEnabled, mode, locations } = useHelpInspector();
@@ -131,14 +131,36 @@ export function VisualHelpHighlighter() {
     };
   }, [locations]);
 
-  // Close active popover when clicking outside
+  // Close active popover when clicking outside, but preserve when right-clicking or interacting with white panels
   useEffect(() => {
     if (!activeKey) return;
     const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest(`[data-help-popover="${activeKey}"]`)) {
-        setActiveKey(null);
+      // Never close the black modal on right-click (contextmenu / button === 2)
+      if (e.button === 2) return;
+
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      // Keep open if clicking inside the black popover itself
+      if (
+        target.closest(`[data-help-popover="${activeKey}"]`) ||
+        target.closest('[data-visual-popover="true"]')
+      ) {
+        return;
       }
+
+      // Keep open if interacting with the white HMS panel or Help Admin modal
+      if (
+        target.closest('[role="dialog"]') ||
+        target.closest('[data-hms-panel]') ||
+        target.closest('.hms-panel') ||
+        target.closest('#help-admin-right-click-modal') ||
+        target.closest('[data-help-admin-modal]')
+      ) {
+        return;
+      }
+
+      setActiveKey(null);
     };
     document.addEventListener("pointerdown", handleClickOutside);
     return () => document.removeEventListener("pointerdown", handleClickOutside);
@@ -360,13 +382,34 @@ export function VisualHelpHighlighter() {
           : "left-1/2 -translate-x-1/2";
 
         // Query all approved articles associated with this location
-        const approvedItems = hmsState.articles.filter(
-          (a) =>
-            a.approvalStatus === "approved" &&
-            (a.contexts?.includes(contextKey) ||
-              articles.some((orig) => orig.id === a.id) ||
-              a.hierarchy?.cardName?.toLowerCase() === label.toLowerCase())
-        );
+        const sec = getSectionFromContext(contextKey, label);
+        const isTabOrSection =
+          contextKey.startsWith("app-tab-") ||
+          contextKey.startsWith("section-") ||
+          contextKey.startsWith("app-nav-");
+
+        const approvedItems = hmsState.articles.filter((a) => {
+          if (a.approvalStatus !== "approved") return false;
+          if (a.contexts?.includes(contextKey)) return true;
+          if (articles.some((orig) => orig.id === a.id)) return true;
+          if (a.hierarchy?.cardName?.toLowerCase() === label.toLowerCase()) return true;
+
+          if (isTabOrSection) {
+            const artPage = (a.hierarchy?.pageName || "").toLowerCase().trim();
+            const secLabel = sec.sectionLabel.toLowerCase().trim();
+            if (artPage && artPage === secLabel) return true;
+            if (a.relatedContext && a.relatedContext.toLowerCase().startsWith(secLabel)) return true;
+            if (
+              a.contexts &&
+              (a.contexts.includes(sec.sectionKey) ||
+                a.contexts.some((c) => c.includes(sec.sectionKey.replace("section-", ""))))
+            ) {
+              return true;
+            }
+          }
+
+          return false;
+        });
 
         const displayItems = approvedItems.length > 0 ? approvedItems : articles;
         const treeItems = buildApprovedTree(displayItems);
@@ -426,10 +469,13 @@ export function VisualHelpHighlighter() {
             {/* Click Micro-Card Tooltip (Elevated to z-[10000]) */}
             {isActive && (
               <div
-                className={`absolute w-96 min-w-[340px] max-w-[95vw] rounded-xl bg-slate-950/95 backdrop-blur-xl p-3 text-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.7)] border border-indigo-500/50 z-[10000] animate-in fade-in zoom-in-95 duration-150 pointer-events-auto ${horizontalPositionClass} ${
+                data-visual-popover="true"
+                className={`absolute w-96 min-w-[340px] max-w-[95vw] rounded-xl bg-slate-950/95 backdrop-blur-xl p-3 text-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.7)] border border-indigo-500/50 z-[10000] animate-in fade-in zoom-in-95 duration-150 pointer-events-auto visual-help-popover ${horizontalPositionClass} ${
                   popoverShowBelow ? "top-full mt-2" : "bottom-full mb-2"
                 }`}
                 onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
               >
                 {/* Modal Header */}
                 <div className="flex items-center justify-between border-b pb-2 mb-2 border-slate-800 gap-2">
@@ -573,7 +619,7 @@ export function VisualHelpHighlighter() {
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 gap-1.5 text-xs border-slate-700 text-slate-200 hover:bg-slate-800 cursor-pointer"
+                className="h-8 gap-1.5 text-xs bg-white text-slate-900 border-slate-300 hover:bg-slate-100 font-semibold cursor-pointer shadow-xs"
                 onClick={() => {
                   if (detailItem) {
                     archiveArticle(detailItem.id);
@@ -587,11 +633,11 @@ export function VisualHelpHighlighter() {
               >
                 {detailItem?.archiveStatus === "archived" ? (
                   <>
-                    <Eye className="size-3.5 text-emerald-400" /> Unhide
+                    <Eye className="size-3.5 text-emerald-600" /> <span className="text-slate-900 font-semibold">Unhide</span>
                   </>
                 ) : (
                   <>
-                    <EyeOff className="size-3.5 text-amber-400" /> Hide from Customers
+                    <EyeOff className="size-3.5 text-amber-600" /> <span className="text-slate-900 font-semibold">Hide from Customers</span>
                   </>
                 )}
               </Button>

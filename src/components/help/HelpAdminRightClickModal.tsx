@@ -66,6 +66,7 @@ import {
   SAMPLE_MEDIA,
   deduplicateNodes,
   repairNodeContent,
+  calculateNonOverlappingPosition,
 } from "@/lib/help-nodes";
 
 export type { HelpAdminNode };
@@ -143,12 +144,28 @@ function getArticleContextAndHierarchy(
     sectionKey ||
     (contextKey && contextKey !== "workspace" ? contextKey : "site-recordings-table");
 
+  const sec = getSectionFromContext(ctxKey, pageName);
+  const tabCtxMap: Record<string, string> = {
+    "section-site-recordings": "app-tab-site-recordings",
+    "section-site-patrol": "app-tab-site-patrol",
+    "section-my-drawings": "app-tab-my-drawings",
+    "section-drawing-videos": "app-tab-drawing-videos",
+  };
+  const tabKey =
+    tabCtxMap[sec.sectionKey] ||
+    (sec.sectionLabel === "Site Recordings" ? "app-tab-site-recordings" : undefined);
+
+  const contexts = Array.from(
+    new Set([ctxKey, sec.sectionKey, tabKey, contextKey].filter(Boolean) as string[])
+  );
+
   return {
     pageName,
     cardName,
     controlName,
     relatedContext: `${pageName} › ${cardName} › ${controlName}`,
     contextKey: ctxKey,
+    contexts,
     hierarchy: {
       pageName,
       cardName,
@@ -570,8 +587,7 @@ export function HelpAdminRightClickModal() {
 
       const modalW = modalSize.width;
       const modalH = modalSize.height;
-      const x = Math.max(12, Math.min(e.clientX, window.innerWidth - modalW - 16));
-      const y = Math.max(12, Math.min(e.clientY, window.innerHeight - modalH - 16));
+      const { x, y } = calculateNonOverlappingPosition(e.clientX, e.clientY, modalW, modalH, 14);
 
       setPos({ x, y });
       setSearch("");
@@ -582,7 +598,16 @@ export function HelpAdminRightClickModal() {
     const handleClickOutside = (e: MouseEvent) => {
       if (isDragging || isResizing || previewNode || addDialogOpen) return;
       const target = e.target as HTMLElement | null;
-      if (target && (target.closest('[role="dialog"]') || target.closest('[role="menu"]'))) return;
+      if (
+        target &&
+        (target.closest('[role="dialog"]') ||
+          target.closest('[role="menu"]') ||
+          target.closest('[data-visual-popover="true"]') ||
+          target.closest('.visual-help-popover') ||
+          target.closest('[data-help-popover]'))
+      ) {
+        return;
+      }
       if (modalRef.current && !modalRef.current.contains(target as Node)) {
         setVisible(false);
         setFolderContextMenu(null);
@@ -934,7 +959,7 @@ export function HelpAdminRightClickModal() {
       contentType: mappedType,
       contentUrl: newNode.contentUrl || null,
       relatedContext: meta.relatedContext,
-      contexts: [meta.contextKey],
+      contexts: meta.contexts || [meta.contextKey],
       hierarchy: meta.hierarchy,
       approvalStatus: user?.role === "admin" ? "approved" : "pending",
       archiveStatus: "active",
@@ -1041,7 +1066,7 @@ export function HelpAdminRightClickModal() {
       contentType: "folder",
       contentUrl: null,
       relatedContext: meta.relatedContext,
-      contexts: [meta.contextKey],
+      contexts: meta.contexts || [meta.contextKey],
       hierarchy: meta.hierarchy,
       approvalStatus: initialStatus,
       archiveStatus: "active",
@@ -1169,6 +1194,7 @@ export function HelpAdminRightClickModal() {
         rejectionReason: undefined,
         hierarchy: meta.hierarchy,
         relatedContext: meta.relatedContext,
+        contexts: meta.contexts || [meta.contextKey],
       });
     } else {
       addArticle({
@@ -1178,7 +1204,7 @@ export function HelpAdminRightClickModal() {
         contentType: mappedType,
         contentUrl: node.contentUrl || null,
         relatedContext: meta.relatedContext,
-        contexts: [meta.contextKey],
+        contexts: meta.contexts || [meta.contextKey],
         hierarchy: meta.hierarchy,
         approvalStatus: "pending",
         archiveStatus: "active",
@@ -1249,6 +1275,8 @@ export function HelpAdminRightClickModal() {
     <TooltipProvider delayDuration={150}>
       <div
         ref={modalRef}
+        data-help-admin-modal="true"
+        id="help-admin-right-click-modal"
         style={
           isModalExpanded
             ? {
@@ -1259,6 +1287,7 @@ export function HelpAdminRightClickModal() {
                 bottom: "16px",
                 width: "calc(100vw - 32px)",
                 height: "calc(100vh - 32px)",
+                zIndex: 10000,
               }
             : {
                 transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`,
@@ -1267,9 +1296,10 @@ export function HelpAdminRightClickModal() {
                 width: `${modalSize.width}px`,
                 height: `${modalSize.height}px`,
                 willChange: isDragging || isResizing ? "transform, width, height" : "auto",
+                zIndex: 10000,
               }
         }
-        className={`fixed z-50 rounded-xl bg-card border border-border/80 shadow-2xl overflow-hidden text-card-foreground select-none flex flex-col font-sans transition-all duration-200 ${
+        className={`fixed z-[10000] rounded-xl bg-card border border-border/80 shadow-2xl overflow-hidden text-card-foreground select-none flex flex-col font-sans transition-all duration-200 ${
           isDragging || isResizing ? "transition-none" : ""
         }`}
       >
@@ -1678,7 +1708,13 @@ export function HelpAdminRightClickModal() {
 
       {/* Add Folder / Content Modal */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent className="max-w-sm rounded-xl">
+        <DialogContent
+          overlayClassName="z-[100001]"
+          overlayStyle={{ zIndex: 100001 }}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{ zIndex: 100002 }}
+          className="max-w-sm rounded-xl z-[100002]"
+        >
           <DialogHeader>
             <DialogTitle className="text-base font-bold flex items-center gap-2 pr-8">
               <Plus className="h-4 w-4 text-blue-600 shrink-0" />

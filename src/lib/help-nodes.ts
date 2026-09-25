@@ -1007,5 +1007,87 @@ export function buildApprovedTree(
   return rootTree;
 }
 
+/**
+ * Calculates a non-overlapping position for the white panel (HMS Panel / Help Admin Modal)
+ * so that it appears adjacent to the dark/black Site Recordings modal (Visual Help Popover)
+ * with a 12-16px gap without overlapping it.
+ *
+ * Checks:
+ * 1. Right side of the black modal (preferred)
+ * 2. Left side of the black modal (if right side overflows viewport)
+ * 3. Below the black modal (if horizontal space is insufficient)
+ * 4. Above the black modal
+ * 5. Viewport clamping and fallback
+ */
+export function calculateNonOverlappingPosition(
+  clientX: number,
+  clientY: number,
+  panelWidth: number,
+  panelHeight: number,
+  gap: number = 14
+): { x: number; y: number } {
+  if (typeof window === "undefined") {
+    return { x: clientX, y: clientY };
+  }
+
+  const viewportW = window.innerWidth;
+  const viewportH = window.innerHeight;
+  const margin = 12;
+
+  // Find the dark/black Site Recordings modal in the DOM if open
+  const blackModal = document.querySelector<HTMLElement>(
+    '[data-visual-popover="true"], .visual-help-popover'
+  );
+
+  if (blackModal) {
+    const rect = blackModal.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      // 1. Preferred: Right side of the black modal with gap
+      const rightX = rect.right + gap;
+      if (rightX + panelWidth <= viewportW - margin) {
+        // Aligns vertically with the top of the black modal, clamped within viewport
+        const y = Math.max(margin, Math.min(rect.top, viewportH - panelHeight - margin));
+        return { x: Math.round(rightX), y: Math.round(y) };
+      }
+
+      // 2. Left side of the black modal with gap
+      const leftX = rect.left - gap - panelWidth;
+      if (leftX >= margin) {
+        const y = Math.max(margin, Math.min(rect.top, viewportH - panelHeight - margin));
+        return { x: Math.round(leftX), y: Math.round(y) };
+      }
+
+      // 3. Below the black modal with gap
+      const bottomY = rect.bottom + gap;
+      if (bottomY + panelHeight <= viewportH - margin) {
+        const x = Math.max(margin, Math.min(rect.left, viewportW - panelWidth - margin));
+        return { x: Math.round(x), y: Math.round(bottomY) };
+      }
+
+      // 4. Above the black modal with gap
+      const topY = rect.top - gap - panelHeight;
+      if (topY >= margin) {
+        const x = Math.max(margin, Math.min(rect.left, viewportW - panelWidth - margin));
+        return { x: Math.round(x), y: Math.round(topY) };
+      }
+
+      // 5. Fallback for constrained viewports: pick whichever side has more room
+      const roomRight = viewportW - rect.right;
+      const roomLeft = rect.left;
+      const x =
+        roomRight >= roomLeft
+          ? Math.min(rect.right + gap, viewportW - panelWidth - margin)
+          : Math.max(margin, rect.left - gap - panelWidth);
+      const y = Math.max(margin, Math.min(rect.top, viewportH - panelHeight - margin));
+      return { x: Math.round(x), y: Math.round(y) };
+    }
+  }
+
+  // Standard right-click viewport clamping when black modal is not open
+  const defaultX = Math.max(margin, Math.min(clientX, viewportW - panelWidth - 16));
+  const defaultY = Math.max(margin, Math.min(clientY, viewportH - panelHeight - 16));
+  return { x: Math.round(defaultX), y: Math.round(defaultY) };
+}
+
 
 

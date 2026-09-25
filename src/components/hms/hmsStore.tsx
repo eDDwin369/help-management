@@ -18,7 +18,7 @@ import {
   labelForContext,
 } from "@/lib/hms-context-registry";
 import { ARTICLE_MEDIA, bodyForArticle, type ArticleSection } from "@/lib/help-content";
-import { syncNodeApprovalStatus, deleteNodeById, toggleHideNode } from "@/lib/help-nodes";
+import { syncNodeApprovalStatus, deleteNodeById, toggleHideNode, calculateNonOverlappingPosition, getSectionFromContext } from "@/lib/help-nodes";
 
 export type ContentType = "video" | "pdf" | "image" | "text" | "folder";
 export type ApprovalStatus = "approved" | "pending" | "unapproved" | "rejected";
@@ -817,8 +817,25 @@ function reducer(state: HmsState, action: Action): HmsState {
             (target && a.id === target.id);
 
           if (isTarget) {
+            const sec = getSectionFromContext(a.contexts?.[0], a.hierarchy?.pageName);
+            const tabKey =
+              sec.sectionKey === "section-site-recordings"
+                ? "app-tab-site-recordings"
+                : sec.sectionKey === "section-site-patrol"
+                ? "app-tab-site-patrol"
+                : sec.sectionKey === "section-my-drawings"
+                ? "app-tab-my-drawings"
+                : sec.sectionKey === "section-drawing-videos"
+                ? "app-tab-drawing-videos"
+                : undefined;
+
+            const updatedContexts = Array.from(
+              new Set([...(a.contexts || []), sec.sectionKey, tabKey].filter(Boolean) as string[])
+            );
+
             return {
               ...a,
+              contexts: updatedContexts,
               approvalStatus: "approved",
               approvedBy: action.adminName,
               approvedAt: now,
@@ -834,8 +851,25 @@ function reducer(state: HmsState, action: Action): HmsState {
             a.approvalStatus !== "rejected" &&
             a.approvalStatus !== "unapproved"
           ) {
+            const sec = getSectionFromContext(a.contexts?.[0], a.hierarchy?.pageName);
+            const tabKey =
+              sec.sectionKey === "section-site-recordings"
+                ? "app-tab-site-recordings"
+                : sec.sectionKey === "section-site-patrol"
+                ? "app-tab-site-patrol"
+                : sec.sectionKey === "section-my-drawings"
+                ? "app-tab-my-drawings"
+                : sec.sectionKey === "section-drawing-videos"
+                ? "app-tab-drawing-videos"
+                : undefined;
+
+            const updatedContexts = Array.from(
+              new Set([...(a.contexts || []), sec.sectionKey, tabKey].filter(Boolean) as string[])
+            );
+
             return {
               ...a,
+              contexts: updatedContexts,
               approvalStatus: "approved",
               approvedBy: action.adminName,
               approvedAt: now,
@@ -1059,9 +1093,8 @@ export function HmsProvider({ children }: { children: ReactNode }) {
       if (e) {
         const panelWidth = 320;
         const panelHeight = 530;
-        const clampedX = Math.max(10, Math.min(window.innerWidth - panelWidth - 10, e.clientX - 20));
-        const clampedY = Math.max(10, Math.min(window.innerHeight - panelHeight - 10, e.clientY - 20));
-        setLastRightClickPos({ x: clampedX, y: clampedY });
+        const { x, y } = calculateNonOverlappingPosition(e.clientX - 20, e.clientY - 20, panelWidth, panelHeight, 14);
+        setLastRightClickPos({ x, y });
       }
       setOpen(true);
       dispatch({ type: "DISMISS_NOTIFICATIONS", role });

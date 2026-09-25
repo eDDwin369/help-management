@@ -78,6 +78,7 @@ function Dashboard() {
                 key={t.v}
                 value={t.v}
                 data-hms-context={t.context}
+                data-hms-label={t.label}
                 className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none px-4 py-3 gap-2"
               >
                 <t.icon className="size-4" />

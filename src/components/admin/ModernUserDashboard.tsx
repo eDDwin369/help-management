@@ -1266,7 +1266,7 @@ export function ModernUserDashboard({
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 gap-1.5 text-xs cursor-pointer"
+                className="h-8 gap-1.5 text-xs bg-white text-slate-900 border-slate-300 hover:bg-slate-100 font-semibold cursor-pointer shadow-xs"
                 onClick={() => {
                   if (dashboardDetailArticle) {
                     archiveArticle(dashboardDetailArticle.id);
@@ -1280,11 +1280,11 @@ export function ModernUserDashboard({
               >
                 {dashboardDetailArticle?.archiveStatus === "archived" ? (
                   <>
-                    <Eye className="size-3.5 text-emerald-600" /> Unhide
+                    <Eye className="size-3.5 text-emerald-600" /> <span className="text-slate-900 font-semibold">Unhide</span>
                   </>
                 ) : (
                   <>
-                    <EyeOff className="size-3.5 text-amber-600" /> Hide from Customers
+                    <EyeOff className="size-3.5 text-amber-600" /> <span className="text-slate-900 font-semibold">Hide from Customers</span>
                   </>
                 )}
               </Button>

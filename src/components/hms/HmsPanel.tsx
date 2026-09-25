@@ -54,7 +54,7 @@ import {
 } from "./hmsStore";
 import { trackHmsEvent } from "@/lib/hms-analytics";
 import { HelpNodeTreeView } from "@/components/help/HelpNodeTreeView";
-import { getSectionFromContext } from "@/lib/help-nodes";
+import { getSectionFromContext, calculateNonOverlappingPosition } from "@/lib/help-nodes";
 
 const NAVY = "#102040";
 
@@ -2979,13 +2979,26 @@ export function HmsPanel() {
   const [isResizing, setIsResizing] = useState(false);
   const userPosRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Position panel at right-click location when opened via right-click
+  // Position panel at right-click location when opened via right-click (adjacent to black modal if open)
   useEffect(() => {
     if (isOpen && lastRightClickPos) {
+      const blackModal = document.querySelector<HTMLElement>('[data-visual-popover="true"], .visual-help-popover');
+      if (blackModal) {
+        const adj = calculateNonOverlappingPosition(
+          lastRightClickPos.x,
+          lastRightClickPos.y,
+          size.width,
+          size.height,
+          14
+        );
+        userPosRef.current = adj;
+        setPos(adj);
+        return;
+      }
       userPosRef.current = lastRightClickPos;
       setPos(lastRightClickPos);
     }
-  }, [isOpen, lastRightClickPos]);
+  }, [isOpen, lastRightClickPos, size.width, size.height]);
 
   // Resize for Preview ("detail") and Add/Edit ("add") while preserving right-click location for normal views
   useEffect(() => {
@@ -3128,7 +3141,10 @@ export function HmsPanel() {
         target.closest?.('.toaster') ||
         target.closest?.('.hms-preview-dialog') ||
         target.closest?.('.hms-preview-overlay') ||
-        target.closest?.('[data-help-preview-dialog]')
+        target.closest?.('[data-help-preview-dialog]') ||
+        target.closest?.('[data-visual-popover="true"]') ||
+        target.closest?.('.visual-help-popover') ||
+        target.closest?.('[data-help-popover]')
       ) {
         return;
       }
@@ -3158,6 +3174,7 @@ export function HmsPanel() {
   return (
     <div
       ref={panelRef}
+      data-hms-panel="true"
       role="dialog"
       aria-modal="false"
       aria-label={`Help Management System — ${crumb}`}
