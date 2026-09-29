@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "@/lib/auth-context";
 import { useHmsStore, type ContentType } from "@/components/hms/hmsStore";
 import { Input } from "@/components/ui/input";
@@ -462,6 +463,18 @@ export function HelpAdminRightClickModal() {
     folderNode: HelpAdminNode;
   } | null>(null);
 
+  // Close folder context menu on Escape key press
+  useEffect(() => {
+    if (!folderContextMenu) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setFolderContextMenu(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [folderContextMenu]);
+
   // Dragging State
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef<{ mouseX: number; mouseY: number; posX: number; posY: number }>({
@@ -511,6 +524,7 @@ export function HelpAdminRightClickModal() {
   }, [modalSize]);
 
   const modalRef = useRef<HTMLDivElement>(null);
+  const folderContextMenuRef = useRef<HTMLDivElement>(null);
 
   // Handle global right click to position and show modal
   useEffect(() => {
@@ -596,20 +610,33 @@ export function HelpAdminRightClickModal() {
     const handleClickOutside = (e: MouseEvent) => {
       if (isDragging || isResizing || previewNode || addDialogOpen) return;
       const target = e.target as HTMLElement | null;
+      if (!target) return;
+
       if (
-        target &&
-        (target.closest('[role="dialog"]') ||
-          target.closest('[role="menu"]') ||
-          target.closest('[data-visual-popover="true"]') ||
-          target.closest('.visual-help-popover') ||
-          target.closest('[data-help-popover]'))
+        target.closest('[role="dialog"]') ||
+        target.closest('[role="menu"]') ||
+        target.closest('[data-visual-popover="true"]') ||
+        target.closest('.visual-help-popover') ||
+        target.closest('[data-help-popover]')
       ) {
         return;
       }
-      if (modalRef.current && !modalRef.current.contains(target as Node)) {
-        setVisible(false);
-        setFolderContextMenu(null);
+
+      // 1. Click is inside the child folder context menu/popover: keep everything open and active
+      if (folderContextMenuRef.current && folderContextMenuRef.current.contains(target as Node)) {
+        return;
       }
+
+      // 2. Click is inside the main Site Recordings modal (but outside the child popover):
+      // Close child popover ONLY; keep main Site Recordings modal open!
+      if (modalRef.current && modalRef.current.contains(target as Node)) {
+        setFolderContextMenu((current) => (current !== null ? null : current));
+        return;
+      }
+
+      // 3. Click is outside the main Site Recordings modal entirely: close main modal & popover
+      setVisible(false);
+      setFolderContextMenu(null);
     };
 
     document.addEventListener("contextmenu", handleContextMenu);
@@ -1620,66 +1647,72 @@ export function HelpAdminRightClickModal() {
           )}
         </div>
 
-        {/* Right-Click Context Menu Floating Overlay */}
-        {folderContextMenu && (
-          <div
-            style={{
-              top: `${folderContextMenu.y - pos.y}px`,
-              left: `${folderContextMenu.x - pos.x}px`,
-            }}
-            className="absolute z-50 w-44 rounded-lg bg-card border border-border shadow-xl p-1 text-xs animate-in fade-in zoom-in-95 duration-100"
-          >
-            <div className="px-2 py-1 font-bold text-[10px] text-muted-foreground border-b border-border/50 truncate">
-              {folderContextMenu.folderNode.kind === "folder" || folderContextMenu.folderNode.kind === "subfolder"
-                ? "📁"
-                : "📄"}{" "}
-              {folderContextMenu.folderNode.name}
-            </div>
-
-            {folderContextMenu.folderNode.kind === "folder" || folderContextMenu.folderNode.kind === "subfolder" ? (
-              <>
-                <button
-                  onClick={() => openAddModal(folderContextMenu.folderNode.id)}
-                  className="w-full text-left px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2 text-foreground font-medium"
-                >
-                  <FolderPlus className="h-3.5 w-3.5 text-amber-500" />
-                  Add Sub-folder
-                </button>
-                <button
-                  onClick={() => triggerDirectFileUpload(folderContextMenu.folderNode.id)}
-                  className="w-full text-left px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2 text-foreground font-medium"
-                >
-                  <Upload className="h-3.5 w-3.5 text-blue-600" />
-                  Upload File
-                </button>
-              </>
-            ) : (
-              <>
-                {folderContextMenu.folderNode.approvalStatus !== "approved" && (
-                  <button
-                    onClick={() => {
-                      handleSendApproval(folderContextMenu.folderNode);
-                      setFolderContextMenu(null);
-                    }}
-                    className="w-full text-left px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2 text-indigo-600 font-medium"
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                    Send Approval
-                  </button>
-                )}
-              </>
-            )}
-
-            <button
-              onClick={() => handleDeleteNode(folderContextMenu.folderNode)}
-              className="w-full text-left px-2 py-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/50 text-red-600 font-medium flex items-center gap-2"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Delete {folderContextMenu.folderNode.kind === "folder" || folderContextMenu.folderNode.kind === "subfolder" ? "Folder" : "Content"}
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* Right-Click Context Menu Floating Overlay (Child Popover) */}
+      {folderContextMenu &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={folderContextMenuRef}
+            style={{
+              top: `${Math.max(10, Math.min(window.innerHeight - 180, folderContextMenu.y))}px`,
+              left: `${Math.max(10, Math.min(window.innerWidth - 190, folderContextMenu.x))}px`,
+            }}
+            className="fixed z-[100020] w-44 rounded-lg bg-card border border-border shadow-2xl p-1 text-xs animate-in fade-in zoom-in-95 duration-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+              <div className="px-2 py-1 font-bold text-[10px] text-muted-foreground border-b border-border/50 truncate">
+                {folderContextMenu.folderNode.kind === "folder" || folderContextMenu.folderNode.kind === "subfolder"
+                  ? "📁"
+                  : "📄"}{" "}
+                {folderContextMenu.folderNode.name}
+              </div>
+
+              {folderContextMenu.folderNode.kind === "folder" || folderContextMenu.folderNode.kind === "subfolder" ? (
+                <>
+                  <button
+                    onClick={() => openAddModal(folderContextMenu.folderNode.id)}
+                    className="w-full text-left px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2 text-foreground font-medium cursor-pointer"
+                  >
+                    <FolderPlus className="h-3.5 w-3.5 text-amber-500" />
+                    Add Sub-folder
+                  </button>
+                  <button
+                    onClick={() => triggerDirectFileUpload(folderContextMenu.folderNode.id)}
+                    className="w-full text-left px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2 text-foreground font-medium cursor-pointer"
+                  >
+                    <Upload className="h-3.5 w-3.5 text-blue-600" />
+                    Upload File
+                  </button>
+                </>
+              ) : (
+                <>
+                  {folderContextMenu.folderNode.approvalStatus !== "approved" && (
+                    <button
+                      onClick={() => {
+                        handleSendApproval(folderContextMenu.folderNode);
+                        setFolderContextMenu(null);
+                      }}
+                      className="w-full text-left px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2 text-indigo-600 font-medium cursor-pointer"
+                    >
+                      <Send className="h-3.5 w-3.5" />
+                      Send Approval
+                    </button>
+                  )}
+                </>
+              )}
+
+              <button
+                onClick={() => handleDeleteNode(folderContextMenu.folderNode)}
+                className="w-full text-left px-2 py-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/50 text-red-600 font-medium flex items-center gap-2 cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete {folderContextMenu.folderNode.kind === "folder" || folderContextMenu.folderNode.kind === "subfolder" ? "Folder" : "Content"}
+              </button>
+            </div>,
+          document.body
+        )}
 
       {/* Hidden native file input for direct OS file picker upload */}
       <input

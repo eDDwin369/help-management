@@ -505,25 +505,16 @@ function Header({
           onClick={() => toast.info("HMS Contextual Assistant v2.0")}
           aria-label="Info"
           title="Info"
-          className="flex items-center justify-center rounded hover:bg-white/10 w-7 h-7 text-slate-400 hover:text-white"
+          className="flex items-center justify-center rounded hover:bg-white/10 w-7 h-7 text-slate-400 hover:text-white cursor-pointer"
         >
           <Info className="w-4 h-4" />
-        </button>
-
-        <button
-          onClick={() => toast.info("Expanded view mode")}
-          aria-label="Expand"
-          title="Expand"
-          className="flex items-center justify-center rounded hover:bg-white/10 w-7 h-7 text-slate-400 hover:text-white"
-        >
-          <Maximize2 className="w-3.5 h-3.5" />
         </button>
 
         <button
           onClick={onClose}
           aria-label="Close"
           title="Close"
-          className="flex items-center justify-center rounded hover:bg-white/10 w-7 h-7 text-slate-400 hover:text-white"
+          className="flex items-center justify-center rounded hover:bg-white/10 w-7 h-7 text-slate-400 hover:text-white cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
