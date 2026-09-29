@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { type HmsArticle, getArticleHierarchy } from "@/components/hms/hmsStore";
 import { SCREEN_IMAGES, COMPONENT_HOTSPOTS, defaultHotspot } from "@/lib/screen-assets";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,7 @@ import {
   Folder,
   ShieldAlert,
   Info,
+  Download,
 } from "lucide-react";
 
 const TYPE_ICON = { video: Video, pdf: FileText, image: ImageIcon, text: FileText, folder: Folder } as const;
@@ -47,6 +49,18 @@ export function SnapshotViewer({
   const isFolder = article?.contentType === "folder";
   const [activeTab, setActiveTab] = useState<"snapshot" | "content">("content");
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
+  const [fullscreenImg, setFullscreenImg] = useState<{ url: string; title: string } | null>(null);
+
+  useEffect(() => {
+    if (!fullscreenImg) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setFullscreenImg(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [fullscreenImg]);
 
   if (!article || isFolder) {
     return (
@@ -285,16 +299,29 @@ export function SnapshotViewer({
                   </span>
                 </div>
 
-                <div className="relative rounded-xl border overflow-hidden bg-slate-900 group shadow-inner">
+                <div
+                  className="relative rounded-xl border overflow-hidden bg-slate-900 group shadow-inner cursor-zoom-in hover:border-purple-500/50 transition-colors"
+                  onClick={() =>
+                    setFullscreenImg({
+                      url: screenImage,
+                      title: `${hierarchy.pageName} - ${hierarchy.controlName}`,
+                    })
+                  }
+                  title="Click to view snapshot full screen"
+                >
                   <img
                     src={screenImage}
                     alt={`${hierarchy.pageName} snapshot`}
                     className="w-full h-auto object-cover max-h-[380px] opacity-90 transition-opacity group-hover:opacity-100"
                   />
+                  <div className="absolute bottom-3 right-3 bg-black/80 hover:bg-black text-white text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-xs pointer-events-none z-20 shadow-md">
+                    <Maximize2 className="size-3.5" />
+                    <span className="text-[11px] font-medium">Click for full screen</span>
+                  </div>
 
                   {/* Highlighted Bounding Box Overlay */}
                   <div
-                    className="absolute border-2 border-purple-500 bg-purple-500/20 rounded shadow-[0_0_15px_rgba(168,85,247,0.5)] transition-all animate-pulse"
+                    className="absolute border-2 border-purple-500 bg-purple-500/20 rounded shadow-[0_0_15px_rgba(168,85,247,0.5)] transition-all animate-pulse pointer-events-none"
                     style={{
                       left: `${hotspot.x}%`,
                       top: `${hotspot.y}%`,
@@ -409,12 +436,25 @@ export function SnapshotViewer({
                 )}
 
                 {article.contentType === "image" && (
-                  <div className="rounded-xl border overflow-hidden bg-slate-950 p-2 flex items-center justify-center min-h-[260px]">
+                  <div
+                    className="relative group rounded-xl border overflow-hidden bg-slate-950 p-2 flex items-center justify-center min-h-[260px] cursor-zoom-in hover:border-purple-500/50 transition-colors"
+                    onClick={() =>
+                      setFullscreenImg({
+                        url: article.contentUrl || screenImage,
+                        title: article.title,
+                      })
+                    }
+                    title="Click to view image full screen"
+                  >
                     <img
                       src={article.contentUrl || screenImage}
                       alt={article.title}
-                      className="w-full h-auto rounded-lg object-contain max-h-[380px]"
+                      className="w-full h-auto rounded-lg object-contain max-h-[380px] transition-transform duration-200 group-hover:scale-[1.01]"
                     />
+                    <div className="absolute bottom-4 right-4 bg-black/80 hover:bg-black text-white text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 opacity-90 group-hover:opacity-100 transition-all backdrop-blur-xs shadow-md pointer-events-none">
+                      <Maximize2 className="size-3.5" />
+                      <span className="font-medium">Click for full screen</span>
+                    </div>
                   </div>
                 )}
 
@@ -494,6 +534,74 @@ export function SnapshotViewer({
           </div>
         )}
       </div>
+
+      {/* Full Screen Image Lightbox */}
+      {fullscreenImg &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100050] bg-black/95 backdrop-blur-md flex flex-col items-center justify-between p-4 animate-in fade-in-0 duration-200"
+            onClick={() => setFullscreenImg(null)}
+          >
+            {/* Top Toolbar */}
+            <div
+              className="w-full max-w-6xl flex items-center justify-between text-white py-2 px-4 border-b border-white/10 shrink-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <ImageIcon className="size-5 text-purple-400 shrink-0" />
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-sm text-white truncate">{fullscreenImg.title}</h3>
+                  <p className="text-[11px] text-white/60 truncate">
+                    {hierarchy.pageName} • {hierarchy.controlName}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {fullscreenImg.url && (
+                  <a
+                    href={fullscreenImg.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    download
+                    className="h-8 px-3 rounded-lg text-xs bg-white/10 hover:bg-white/20 text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Download className="size-3.5" />
+                    <span>Download</span>
+                  </a>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="size-8 p-0 rounded-lg text-white/80 hover:text-white hover:bg-white/20 cursor-pointer"
+                  onClick={() => setFullscreenImg(null)}
+                >
+                  <X className="size-5" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Image Canvas */}
+            <div
+              className="flex-1 w-full flex items-center justify-center p-4 min-h-0 overflow-auto"
+              onClick={() => setFullscreenImg(null)}
+            >
+              <img
+                src={fullscreenImg.url}
+                alt={fullscreenImg.title}
+                className="max-w-[96vw] max-h-[85vh] w-auto h-auto object-contain rounded-xl shadow-2xl transition-all cursor-default select-none border border-white/10"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+
+            {/* Bottom Footer hint */}
+            <div className="text-[11px] text-white/50 py-1 text-center shrink-0">
+              Press <kbd className="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-white/80">Esc</kbd> or click outside to close full screen
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
