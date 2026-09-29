@@ -526,6 +526,81 @@ export function HelpAdminRightClickModal() {
   const modalRef = useRef<HTMLDivElement>(null);
   const folderContextMenuRef = useRef<HTMLDivElement>(null);
 
+  // Dynamic side-by-side positioning:
+  // When both the black VisualHelp panel and this white modal are open,
+  // position them side-by-side without overlapping (Prefer: Black -> left, White -> right; reverse if right is full)
+  useEffect(() => {
+    if (!visible || isModalExpanded) return;
+
+    const repositionSideBySide = () => {
+      if (isDragging || isResizing) return;
+
+      const blackModal = document.querySelector<HTMLElement>(
+        '[data-visual-popover="true"], .visual-help-popover'
+      );
+      if (!blackModal) return;
+
+      const blackRect = blackModal.getBoundingClientRect();
+      if (blackRect.width === 0 || blackRect.height === 0) return;
+
+      const nextPos = calculateNonOverlappingPosition(
+        pos.x,
+        pos.y,
+        modalSize.width,
+        modalSize.height,
+        14
+      );
+
+      setPos((prev) => {
+        if (Math.abs(prev.x - nextPos.x) > 3 || Math.abs(prev.y - nextPos.y) > 3) {
+          return nextPos;
+        }
+        return prev;
+      });
+    };
+
+    // Check immediately and on subsequent animation frames / timer
+    repositionSideBySide();
+    const frameId = requestAnimationFrame(repositionSideBySide);
+    const timerId = setTimeout(repositionSideBySide, 50);
+
+    // Event listener for black popover toggle
+    const handlePopoverChange = () => {
+      requestAnimationFrame(repositionSideBySide);
+      setTimeout(repositionSideBySide, 40);
+    };
+
+    // Window resize listener
+    const handleResize = () => {
+      repositionSideBySide();
+    };
+
+    window.addEventListener("hms_visual_popover_change", handlePopoverChange);
+    window.addEventListener("resize", handleResize);
+
+    // MutationObserver to catch any appearance or styling changes of black popover
+    let observer: MutationObserver | null = null;
+    if (typeof MutationObserver !== "undefined") {
+      observer = new MutationObserver(() => {
+        repositionSideBySide();
+      });
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["data-visual-popover", "class", "style"],
+      });
+    }
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      clearTimeout(timerId);
+      window.removeEventListener("hms_visual_popover_change", handlePopoverChange);
+      window.removeEventListener("resize", handleResize);
+      if (observer) observer.disconnect();
+    };
+  }, [visible, isModalExpanded, isDragging, isResizing, modalSize.width, modalSize.height]);
+
   // Handle global right click to position and show modal
   useEffect(() => {
     if (!isHelpAdmin) {

@@ -1032,7 +1032,7 @@ export function calculateNonOverlappingPosition(
 
   const viewportW = window.innerWidth;
   const viewportH = window.innerHeight;
-  const margin = 12;
+  const margin = 14;
 
   // Find the dark/black Site Recordings modal in the DOM if open
   const blackModal = document.querySelector<HTMLElement>(
@@ -1042,7 +1042,7 @@ export function calculateNonOverlappingPosition(
   if (blackModal) {
     const rect = blackModal.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) {
-      // 1. Preferred: Right side of the black modal with gap
+      // 1. Preferred: Right side of the black modal with clear gap (Black panel -> left, White modal -> right)
       const rightX = rect.right + gap;
       if (rightX + panelWidth <= viewportW - margin) {
         // Aligns vertically with the top of the black modal, clamped within viewport
@@ -1050,34 +1050,20 @@ export function calculateNonOverlappingPosition(
         return { x: Math.round(rightX), y: Math.round(y) };
       }
 
-      // 2. Left side of the black modal with gap
+      // 2. Reverse: Left side of the black modal with gap (if not enough space on right, White modal -> left)
       const leftX = rect.left - gap - panelWidth;
       if (leftX >= margin) {
         const y = Math.max(margin, Math.min(rect.top, viewportH - panelHeight - margin));
         return { x: Math.round(leftX), y: Math.round(y) };
       }
 
-      // 3. Below the black modal with gap
-      const bottomY = rect.bottom + gap;
-      if (bottomY + panelHeight <= viewportH - margin) {
-        const x = Math.max(margin, Math.min(rect.left, viewportW - panelWidth - margin));
-        return { x: Math.round(x), y: Math.round(bottomY) };
-      }
-
-      // 4. Above the black modal with gap
-      const topY = rect.top - gap - panelHeight;
-      if (topY >= margin) {
-        const x = Math.max(margin, Math.min(rect.left, viewportW - panelWidth - margin));
-        return { x: Math.round(x), y: Math.round(topY) };
-      }
-
-      // 5. Fallback for constrained viewports: pick whichever side has more room
+      // 3. Fallback for constrained viewports: pick whichever side has more room and clamp within viewport
       const roomRight = viewportW - rect.right;
       const roomLeft = rect.left;
       const x =
         roomRight >= roomLeft
-          ? Math.min(rect.right + gap, viewportW - panelWidth - margin)
-          : Math.max(margin, rect.left - gap - panelWidth);
+          ? Math.max(margin, Math.min(rect.right + gap, viewportW - panelWidth - margin))
+          : Math.max(margin, Math.min(rect.left - gap - panelWidth, viewportW - panelWidth - margin));
       const y = Math.max(margin, Math.min(rect.top, viewportH - panelHeight - margin));
       return { x: Math.round(x), y: Math.round(y) };
     }

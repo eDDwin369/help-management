@@ -51,6 +51,15 @@ export function VisualHelpHighlighter() {
     }
   };
 
+  // Dispatch event whenever the black visual popover opens or closes
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("hms_visual_popover_change", {
+        detail: { activeKey, isOpen: Boolean(activeKey) },
+      })
+    );
+  }, [activeKey]);
+
   // Direct DOM style mutation on rAF to bypass React render cycle latency & track 60fps synchronously
   useEffect(() => {
     let rAfId: number | null = null;
