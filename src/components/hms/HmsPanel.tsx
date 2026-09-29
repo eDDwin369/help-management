@@ -31,12 +31,12 @@ import {
   Mic,
   Plus,
   ArrowUp,
+  Square,
   Sparkles,
   Headphones,
   PlusCircle,
   Info,
   Home,
-  ExternalLink,
 } from "lucide-react";
 import {
   useHmsStore,
@@ -1120,14 +1120,7 @@ function ListView({
             : state.articles.length}{" "}
           folders / items
         </span>
-        <button
-          type="button"
-          onClick={onContentLibrary}
-          className="hover:text-blue-600 flex items-center gap-1 font-semibold transition-colors cursor-pointer"
-        >
-          <span>HMS Panel</span>
-          <ExternalLink className="w-3 h-3" />
-        </button>
+
       </div>
     </div>
   );
@@ -1162,6 +1155,157 @@ function HmsBottomBar({
 
 // ---------- AI CHAT VIEW ----------
 
+function FormattedAiMessage({ text }: { text: string }) {
+  const lines = text.split("\n");
+
+  type Block =
+    | { type: "paragraph"; text: string }
+    | { type: "bullet-list"; items: { label?: string; content: string; bullet?: string }[] };
+
+  const blocks: Block[] = [];
+  let currentList: { label?: string; content: string; bullet?: string }[] | null = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i];
+    const trimmed = rawLine.trim();
+
+    if (!trimmed) {
+      if (currentList && currentList.length > 0) {
+        blocks.push({ type: "bullet-list", items: currentList });
+        currentList = null;
+      }
+      continue;
+    }
+
+    // Check if line is a bullet item (starting with •, -, *, or numbered emoji like 1️⃣, 2️⃣, etc.)
+    const bulletMatch = trimmed.match(/^([•\-\*]|\d+[.)]|[\u{1F300}-\u{1F9FF}][\uFE0F\u20E3]?)\s*(.*)$/u);
+
+    if (bulletMatch) {
+      const bulletPrefix = bulletMatch[1];
+      const rest = bulletMatch[2];
+
+      const colonMatch = rest.match(/^([^:]+:)\s*(.*)$/);
+      let label: string | undefined = undefined;
+      let content = rest;
+
+      if (colonMatch) {
+        label = colonMatch[1];
+        content = colonMatch[2];
+      }
+
+      if (!currentList) {
+        currentList = [];
+      }
+      currentList.push({
+        label,
+        content,
+        bullet: bulletPrefix === "•" || bulletPrefix === "-" || bulletPrefix === "*" ? undefined : bulletPrefix,
+      });
+    } else {
+      if (currentList && currentList.length > 0) {
+        blocks.push({ type: "bullet-list", items: currentList });
+        currentList = null;
+      }
+      blocks.push({ type: "paragraph", text: trimmed });
+    }
+  }
+
+  if (currentList && currentList.length > 0) {
+    blocks.push({ type: "bullet-list", items: currentList });
+  }
+
+  return (
+    <div className="space-y-2 text-xs text-slate-800 dark:text-slate-200">
+      {blocks.map((block, idx) => {
+        if (block.type === "paragraph") {
+          const isHeading =
+            block.text.endsWith(":") ||
+            block.text.startsWith("📌") ||
+            block.text.startsWith("⏱️") ||
+            block.text.startsWith("⚙️") ||
+            block.text.startsWith("💡");
+          return (
+            <p
+              key={idx}
+              className={`${
+                isHeading
+                  ? "font-semibold text-slate-900 dark:text-slate-100 text-[11.5px] tracking-tight mb-1"
+                  : "text-slate-700 dark:text-slate-300 leading-relaxed"
+              }`}
+            >
+              {block.text}
+            </p>
+          );
+        }
+
+        return (
+          <div key={idx} className="space-y-2 pl-0.5">
+            {block.items.map((item, itemIdx) => (
+              <div key={itemIdx} className="flex items-start gap-2 text-xs leading-relaxed group">
+                {item.bullet ? (
+                  <span className="text-xs shrink-0 select-none">{item.bullet}</span>
+                ) : (
+                  <span className="size-1.5 rounded-full bg-purple-600 dark:bg-purple-400 mt-1.5 shrink-0 shadow-2xs" />
+                )}
+                <div className="flex-1 text-slate-700 dark:text-slate-300">
+                  {item.label && (
+                    <span className="font-semibold text-slate-900 dark:text-slate-100 mr-1.5">
+                      {item.label}
+                    </span>
+                  )}
+                  <span>{item.content}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function VoiceWaveform() {
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick((t) => (t + 1) % 100);
+    }, 110);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Pre-calculated wave heights oscillating dynamically to mimic active speech
+  const waveHeights = [
+    5 + Math.sin(tick * 0.7) * 3,
+    9 + Math.cos(tick * 0.9) * 5,
+    14 + Math.sin(tick * 1.2) * 6,
+    18 + Math.cos(tick * 1.0) * 7,
+    13 + Math.sin(tick * 0.8) * 5,
+    8 + Math.cos(tick * 1.1) * 4,
+    4 + Math.sin(tick * 0.6) * 2,
+  ];
+
+  return (
+    <div className="flex items-center gap-1 overflow-hidden flex-1 justify-center px-1 select-none pointer-events-none">
+      {/* 22 static track dots matching the reference UI */}
+      {Array.from({ length: 22 }).map((_, i) => (
+        <span
+          key={`dot-${i}`}
+          className="size-1 rounded-full bg-slate-300 dark:bg-slate-600 shrink-0"
+        />
+      ))}
+      {/* Dynamic equalizer soundwave bars matching the reference UI */}
+      {waveHeights.map((h, i) => (
+        <span
+          key={`bar-${i}`}
+          style={{ height: `${Math.max(3, h)}px` }}
+          className="w-0.5 rounded-full bg-slate-700 dark:bg-slate-300 shrink-0 transition-all duration-100"
+        />
+      ))}
+    </div>
+  );
+}
+
 function AiChatView({
   initialPrompt,
   role,
@@ -1195,6 +1339,11 @@ function AiChatView({
   const [isTyping, setIsTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const sentInitialRef = useRef<string | null>(null);
+
+  const isTalkInitial = Boolean(initialPrompt && initialPrompt.toLowerCase().includes("talk"));
+  const [isVoiceRecording, setIsVoiceRecording] = useState<boolean>(isTalkInitial);
+  const [transcript, setTranscript] = useState("");
+  const recognitionRef = useRef<any>(null);
 
   const activeSection = useMemo(
     () => getSectionFromContext(contextKey, context),
@@ -1342,6 +1491,89 @@ function AiChatView({
     }, 750);
   };
 
+  const startListening = () => {
+    setIsVoiceRecording(true);
+    setTranscript("");
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = "en-US";
+
+        recognition.onresult = (event: any) => {
+          let current = "";
+          for (let i = 0; i < event.results.length; i++) {
+            current += event.results[i][0].transcript;
+          }
+          if (current) {
+            setTranscript(current);
+          }
+        };
+
+        recognition.onerror = (e: any) => {
+          console.warn("Speech recognition error:", e);
+        };
+
+        recognition.start();
+        recognitionRef.current = recognition;
+      } catch (err) {
+        console.warn("Could not start SpeechRecognition:", err);
+      }
+    }
+  };
+
+  const stopListening = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+      recognitionRef.current = null;
+    }
+  };
+
+  const handleSendVoice = () => {
+    stopListening();
+    setIsVoiceRecording(false);
+    const spoken = transcript.trim();
+    setTranscript("");
+    if (spoken) {
+      handleSend(spoken);
+    } else if (input.trim()) {
+      handleSend(input.trim());
+      setInput("");
+    } else {
+      handleSend(`Can you guide me through ${sectionTitle}?`);
+    }
+  };
+
+  const handleStopVoice = () => {
+    stopListening();
+    if (transcript.trim()) {
+      setInput(transcript.trim());
+    }
+    setIsVoiceRecording(false);
+  };
+
+  const handleCancelVoice = () => {
+    stopListening();
+    setIsVoiceRecording(false);
+    setTranscript("");
+  };
+
+  useEffect(() => {
+    if (isTalkInitial) {
+      startListening();
+    }
+    return () => {
+      stopListening();
+    };
+  }, []);
+
   useEffect(() => {
     if (initialPrompt && sentInitialRef.current !== initialPrompt) {
       sentInitialRef.current = initialPrompt;
@@ -1440,7 +1672,11 @@ function AiChatView({
                   <span>HMS AI Assistant</span>
                 </div>
               )}
-              <p className="whitespace-pre-line">{m.text}</p>
+              {m.sender === "user" ? (
+                <p className="whitespace-pre-line">{m.text}</p>
+              ) : (
+                <FormattedAiMessage text={m.text} />
+              )}
 
               {m.showFileStructures && (
                 <div className="mt-3 pt-2.5 border-t border-gray-200">
@@ -1469,33 +1705,88 @@ function AiChatView({
         <div ref={bottomRef} />
       </div>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!input.trim()) return;
-          handleSend(input);
-        }}
-        className="shrink-0 p-3 bg-white border-t border-gray-100 flex items-center gap-2"
-      >
-        <div className="flex-1 flex items-center gap-2 bg-gray-50 border border-gray-200 focus-within:border-purple-300 focus-within:ring-2 focus-within:ring-purple-500/20 rounded-2xl px-3 py-2 shadow-sm transition-all">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask AI a question..."
-            className="w-full bg-transparent text-xs text-gray-800 placeholder-gray-400 focus:outline-none"
-          />
-          {input.trim() && (
-            <button
-              type="submit"
-              title="Send message to AI"
-              className="size-7 rounded-full flex items-center justify-center text-white bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 shadow-sm hover:scale-105 active:scale-95 transition-all shrink-0 cursor-pointer"
-            >
-              <ArrowUp className="size-3.5 stroke-[2.8]" />
-            </button>
+      {isVoiceRecording ? (
+        <div className="shrink-0 p-3 bg-white border-t border-gray-100 flex flex-col gap-1.5">
+          {transcript && (
+            <div className="px-3 text-[11px] text-purple-700 dark:text-purple-400 font-medium italic truncate max-w-full">
+              "{transcript}"
+            </div>
           )}
+          <div className="flex items-center justify-between w-full bg-white dark:bg-card border border-slate-200 dark:border-border rounded-full px-2 py-1 shadow-xs">
+            {/* Cancel (X) Button */}
+            <button
+              type="button"
+              onClick={handleCancelVoice}
+              title="Cancel voice input"
+              className="size-7 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+            >
+              <X className="size-3.5 stroke-[2.5]" />
+            </button>
+
+            {/* Dotted soundwave visualizer */}
+            <VoiceWaveform />
+
+            {/* Right Action Buttons */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Stop Button */}
+              <button
+                type="button"
+                onClick={handleStopVoice}
+                title="Stop recording"
+                className="size-7 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+              >
+                <Square className="size-3 fill-slate-900 dark:fill-slate-100 text-slate-900 dark:text-slate-100 rounded-xs" />
+              </button>
+
+              {/* Blue Send Button */}
+              <button
+                type="button"
+                onClick={handleSendVoice}
+                title="Send voice message"
+                className="size-7 rounded-full bg-[#2563EB] hover:bg-blue-700 active:scale-95 text-white flex items-center justify-center shadow-xs transition-all shrink-0 cursor-pointer"
+              >
+                <ArrowUp className="size-3.5 stroke-[2.8]" />
+              </button>
+            </div>
+          </div>
         </div>
-      </form>
+      ) : (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!input.trim()) return;
+            handleSend(input);
+          }}
+          className="shrink-0 p-3 bg-white border-t border-gray-100 flex items-center gap-2"
+        >
+          <div className="flex-1 flex items-center gap-2 bg-gray-50 border border-gray-200 focus-within:border-purple-300 focus-within:ring-2 focus-within:ring-purple-500/20 rounded-2xl px-3 py-1.5 shadow-sm transition-all">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask AI a question..."
+              className="w-full bg-transparent text-xs text-gray-800 placeholder-gray-400 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={startListening}
+              title="Click to talk (Mic)"
+              className="size-7 rounded-full flex items-center justify-center text-gray-500 hover:text-purple-600 hover:bg-purple-50 transition-colors shrink-0 cursor-pointer"
+            >
+              <Mic className="size-4" />
+            </button>
+            {input.trim() && (
+              <button
+                type="submit"
+                title="Send message to AI"
+                className="size-7 rounded-full flex items-center justify-center text-white bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 shadow-sm hover:scale-105 active:scale-95 transition-all shrink-0 cursor-pointer"
+              >
+                <ArrowUp className="size-3.5 stroke-[2.8]" />
+              </button>
+            )}
+          </div>
+        </form>
+      )}
     </div>
   );
 }

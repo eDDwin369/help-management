@@ -8,8 +8,6 @@ import {
   Video,
   Eye,
   Search,
-  Maximize2,
-  Minimize2,
   Info,
   Layers,
 } from "lucide-react";
@@ -99,16 +97,7 @@ export function HelpNodeTreeView({
     return filterNodes(sectionScopedNodes, search, onlyApproved);
   }, [sectionScopedNodes, search, onlyApproved]);
 
-  const allFolderIds = useMemo(() => getAllFolderIds(filteredNodes), [filteredNodes]);
-  const isAllExpanded = allFolderIds.length > 0 && allFolderIds.every((id) => expandedIds.has(id));
 
-  const handleToggleExpandAll = () => {
-    if (isAllExpanded) {
-      setExpandedIds(new Set());
-    } else {
-      setExpandedIds(new Set(allFolderIds));
-    }
-  };
 
   const toggleFolder = (folderId: string) => {
     setExpandedIds((prev) => {
@@ -130,7 +119,7 @@ export function HelpNodeTreeView({
   return (
     <TooltipProvider>
       <div className={`flex flex-col bg-white dark:bg-card rounded-xl border border-slate-200/80 dark:border-border/70 overflow-hidden shadow-xs ${className}`}>
-        {/* Header Bar with Search & Explode / Collapse All button */}
+        {/* Header Bar with Search */}
         <div className="p-2.5 bg-slate-50/90 dark:bg-muted/40 border-b border-slate-200/80 dark:border-border/60 flex flex-col gap-2 shrink-0">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
@@ -139,25 +128,6 @@ export function HelpNodeTreeView({
                 {filteredNodes.length} Approved Folder{filteredNodes.length === 1 ? "" : "s"}
               </span>
             </div>
-
-            <button
-              type="button"
-              onClick={handleToggleExpandAll}
-              className="px-2 py-0.5 rounded-md text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/70 dark:hover:bg-slate-800 transition-colors flex items-center gap-1 cursor-pointer border border-slate-200 dark:border-slate-700 shadow-2xs"
-              title={isAllExpanded ? "Collapse all folders" : "Expand all folders"}
-            >
-              {isAllExpanded ? (
-                <>
-                  <Minimize2 className="size-2.5 text-slate-500" />
-                  <span>Collapse All</span>
-                </>
-              ) : (
-                <>
-                  <Maximize2 className="size-2.5 text-slate-500" />
-                  <span>Expand All</span>
-                </>
-              )}
-            </button>
           </div>
 
           {showSearch && (

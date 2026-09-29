@@ -1,28 +1,26 @@
-import { useState, useEffect, useMemo } from "react";
-import { type HmsArticle, type ContentType, type ApprovalStatus, getArticleHierarchy, useHmsStore } from "@/components/hms/hmsStore";
-import { getFolderContents } from "@/lib/help-nodes";
+import { useState } from "react";
+import { type HmsArticle, getArticleHierarchy } from "@/components/hms/hmsStore";
 import { SCREEN_IMAGES, COMPONENT_HOTSPOTS, defaultHotspot } from "@/lib/screen-assets";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import {
-  AlertTriangle,
   Check,
   ChevronRight,
   Eye,
   FileText,
   Image as ImageIcon,
   Maximize2,
-  Minimize2,
   Play,
   RotateCcw,
-  ShieldAlert,
   User,
   Video,
   X,
   Sparkles,
   Folder,
-  FolderOpen,
+  ShieldAlert,
+  Info,
 } from "lucide-react";
 
 const TYPE_ICON = { video: Video, pdf: FileText, image: ImageIcon, text: FileText, folder: Folder } as const;
@@ -44,94 +42,74 @@ export function SnapshotViewer({
   onExpandFullscreen,
   onClose,
   canApprove = true,
-  onSelectArticle,
+  onSelectArticle: _onSelectArticle,
 }: SnapshotViewerProps) {
   const isFolder = article?.contentType === "folder";
   const [activeTab, setActiveTab] = useState<"snapshot" | "content">("content");
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
-  const { state: hmsState } = useHmsStore();
 
-  const folderItems = useMemo(() => {
-    if (!article || article.contentType !== "folder") return [];
-
-    // 1. Get real nodes from help-nodes storage
-    const nodeChildren = getFolderContents(article.id);
-    if (nodeChildren.length > 0) {
-      return nodeChildren.map((nc) => {
-        // Match against current articles in hmsState
-        const matched = hmsState.articles.find(
-          (a) =>
-            a.id === nc.id ||
-            a.id === `art-${nc.id}` ||
-            a.title.toLowerCase() === nc.name.toLowerCase()
-        );
-        return {
-          id: matched ? matched.id : `art-${nc.id}`,
-          nodeId: nc.id,
-          name: nc.name,
-          type: (nc.kind === "subfolder" ? "folder" : nc.kind) as ContentType,
-          size: nc.size,
-          approvalStatus: (matched?.approvalStatus || nc.approvalStatus) as ApprovalStatus,
-          rejectionReason: matched?.rejectionReason || nc.rejectionReason,
-        };
-      });
-    }
-
-    // 2. Lookup articles in hmsState belonging to this folder card
-    const related = hmsState.articles.filter(
-      (a) =>
-        a.id !== article.id &&
-        a.hierarchy?.cardName?.toLowerCase() === article.title.toLowerCase()
-    );
-    if (related.length > 0) {
-      return related.map((r) => ({
-        id: r.id,
-        nodeId: r.id.replace(/^art-/, ""),
-        name: r.title,
-        type: r.contentType,
-        size: undefined,
-        approvalStatus: r.approvalStatus,
-        rejectionReason: r.rejectionReason,
-      }));
-    }
-
-    if (article.folderChildren && article.folderChildren.length > 0) {
-      return article.folderChildren.map((c) => ({
-        id: c.id,
-        nodeId: c.id,
-        name: c.name,
-        type: c.type,
-        size: c.size,
-        approvalStatus: c.approvalStatus,
-        rejectionReason: undefined,
-      }));
-    }
-
-    return [];
-  }, [article, hmsState.articles]);
-
-  useEffect(() => {
-    if (article?.contentType === "folder") {
-      setActiveTab("content");
-      return;
-    }
-    if (article?.contentUrl) {
-      setActiveTab("content");
-    } else {
-      setActiveTab("snapshot");
-    }
-  }, [article?.id, article?.contentUrl, article?.contentType]);
-
-  if (!article) {
+  if (!article || isFolder) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-card rounded-2xl border border-dashed border-border/70 text-muted-foreground min-h-[400px]">
-        <div className="size-12 rounded-2xl bg-muted/50 flex items-center justify-center mb-3">
-          <Eye className="size-6 text-muted-foreground/60" />
+        <div className="size-14 rounded-2xl bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center mb-3.5 text-amber-600 dark:text-amber-400 shadow-2xs">
+          {isFolder ? (
+            <Folder className="size-7" />
+          ) : (
+            <Eye className="size-7 text-muted-foreground/60" />
+          )}
         </div>
-        <h3 className="font-semibold text-foreground text-sm">No Help Entry Selected</h3>
-        <p className="text-xs text-muted-foreground max-w-xs mt-1">
-          Select any Help record from the hierarchical report on the left to inspect its screen snapshot, target control, associated media, and approval status.
-        </p>
+        <div className="flex items-center justify-center gap-1.5">
+          <h3 className="font-semibold text-foreground text-sm">
+            {isFolder ? `Folder: ${article.title}` : "No Content Selected"}
+          </h3>
+          {isFolder && (
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center size-5 rounded-full text-muted-foreground/70 hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer shrink-0"
+                    aria-label="Folder info"
+                  >
+                    <Info className="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" align="center" className="max-w-xs text-xs font-normal text-center">
+                  Folders do not have a preview. Preview is only available for contents like PDF, documents, videos, and images.
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
+        {!isFolder && (
+          <p className="text-xs text-muted-foreground max-w-xs mt-1.5 leading-relaxed">
+            Select any content item (PDF, DOC, video, or image) from the list to preview.
+          </p>
+        )}
+
+        {isFolder && canApprove && (
+          <div className="mt-5 flex items-center gap-2">
+            {(article.approvalStatus === "pending" || article.approvalStatus === "approved") && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 px-3 text-xs text-rose-600 border-rose-200 hover:bg-rose-50 dark:border-rose-950 dark:hover:bg-rose-950/50 gap-1.5"
+                onClick={() => onReject(article.id)}
+              >
+                <X className="size-3.5" /> Reject Folder
+              </Button>
+            )}
+            {(article.approvalStatus === "pending" || article.approvalStatus === "unapproved" || article.approvalStatus === "rejected") && (
+              <Button
+                size="sm"
+                className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-xs"
+                onClick={() => onApprove(article.id)}
+              >
+                <Check className="size-3.5" /> Approve Folder
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -197,10 +175,25 @@ export function SnapshotViewer({
         </div>
 
         {/* Title & Badges */}
-        <div className="flex items-start justify-between gap-3 pt-1">
-          <div>
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             <h2 className="font-semibold text-base text-foreground leading-tight">{article.title}</h2>
-            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{article.description}</p>
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="inline-flex items-center justify-center size-5 rounded-full text-muted-foreground/70 hover:text-foreground hover:bg-muted/80 transition-colors cursor-pointer shrink-0"
+                    aria-label="Resource upload info"
+                  >
+                    <Info className="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="start" className="max-w-xs text-xs font-normal">
+                  {article.description || `Help resource uploaded by ${article.authorName}`}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           <Badge
             className={`shrink-0 text-xs px-2.5 py-0.5 ${
@@ -223,46 +216,28 @@ export function SnapshotViewer({
           </Badge>
         </div>
 
-        {/* View Mode Tabs or Folder Header */}
-        {!isFolder ? (
-          <div className="pt-2 flex items-center justify-between">
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-auto">
-              <TabsList className="h-7 bg-muted/60 p-0.5 rounded-lg text-xs">
-                <TabsTrigger value="snapshot" className="text-[11px] h-6 px-2.5 gap-1.5 data-[state=active]:bg-background">
-                  <Eye className="size-3" /> Snapshot & Control
-                </TabsTrigger>
-                <TabsTrigger value="content" className="text-[11px] h-6 px-2.5 gap-1.5 data-[state=active]:bg-background">
-                  <Icon className="size-3" /> Media / Content
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+        {/* View Mode Tabs */}
+        <div className="pt-2 flex items-center justify-between">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-auto">
+            <TabsList className="h-7 bg-muted/60 p-0.5 rounded-lg text-xs">
+              <TabsTrigger value="snapshot" className="text-[11px] h-6 px-2.5 gap-1.5 data-[state=active]:bg-background">
+                <Eye className="size-3" /> Snapshot & Control
+              </TabsTrigger>
+              <TabsTrigger value="content" className="text-[11px] h-6 px-2.5 gap-1.5 data-[state=active]:bg-background">
+                <Icon className="size-3" /> Media / Content
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <User className="size-3" /> {article.authorName}
-              </span>
-              <Badge variant="outline" className="text-[10px] gap-1 uppercase tracking-wider">
-                <Icon className="size-3" /> {article.contentType}
-              </Badge>
-            </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <User className="size-3" /> {article.authorName}
+            </span>
+            <Badge variant="outline" className="text-[10px] gap-1 uppercase tracking-wider">
+              <Icon className="size-3" /> {article.contentType}
+            </Badge>
           </div>
-        ) : (
-          <div className="pt-2 flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-              <Folder className="size-3.5 text-amber-500" />
-              <span>Folder Directory & Contents</span>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <User className="size-3" /> {article.authorName}
-              </span>
-              <Badge variant="outline" className="text-[10px] gap-1 uppercase tracking-wider bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900">
-                <Folder className="size-3" /> Folder
-              </Badge>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Main Viewer Body Area */}
@@ -295,148 +270,8 @@ export function SnapshotViewer({
           </div>
         )}
 
-        {isFolder ? (
-          /* FOLDER VIEW: Strictly NO screenshot, target overlay, or media preview */
-          <div className="space-y-4">
-            <div className="rounded-xl border bg-card p-4 space-y-3">
-              <div className="flex items-center justify-between border-b pb-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="size-9 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                    <Folder className="size-5" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-sm text-foreground">{article.title}</div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {folderItems.length} content item{folderItems.length === 1 ? "" : "s"} inside folder
-                    </div>
-                  </div>
-                </div>
-                <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900">
-                  Folder
-                </Badge>
-              </div>
-
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {article.description || "Folder containing documentation and operational media."}
-              </p>
-
-              <div className="space-y-1.5 pt-1">
-                <div className="flex items-center justify-between">
-                  <div className="text-[11px] font-semibold text-foreground uppercase tracking-wider">
-                    Folder Contents ({folderItems.length})
-                  </div>
-                  <span className="text-[10px] text-muted-foreground">
-                    Approve/reject individual contents or the entire folder
-                  </span>
-                </div>
-
-                {folderItems.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-muted-foreground border rounded-xl bg-muted/10">
-                    No files or media found inside this folder.
-                  </div>
-                ) : (
-                  <div className="divide-y divide-border/60 border rounded-xl overflow-hidden bg-muted/20">
-                    {folderItems.map((child) => {
-                      const ChildIcon = TYPE_ICON[child.type as ContentType] || FileText;
-                      const isChildApproved = child.approvalStatus === "approved";
-                      const isChildRejected =
-                        child.approvalStatus === "unapproved" || child.approvalStatus === "rejected";
-
-                      return (
-                        <div
-                          key={child.id}
-                          onClick={() => {
-                            if (onSelectArticle) {
-                              onSelectArticle(child.id);
-                            }
-                          }}
-                          className={`p-2.5 px-3 flex items-center justify-between text-xs hover:bg-muted/40 transition-colors ${
-                            onSelectArticle ? "cursor-pointer" : ""
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <ChildIcon className="size-4 text-muted-foreground shrink-0" />
-                            <span className="font-medium text-foreground truncate">{child.name}</span>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {child.size && (
-                              <span className="text-[10px] text-muted-foreground">{child.size}</span>
-                            )}
-                            <Badge
-                              variant="outline"
-                              className={`text-[9px] px-1.5 py-0 ${
-                                isChildApproved
-                                  ? "bg-emerald-50 text-emerald-600 border-emerald-300"
-                                  : isChildRejected
-                                  ? "bg-rose-50 text-rose-600 border-rose-300"
-                                  : "bg-amber-50 text-amber-600 border-amber-300"
-                              }`}
-                            >
-                              {isChildApproved
-                                ? "Approved"
-                                : isChildRejected
-                                ? "Rejected"
-                                : "Pending Review"}
-                            </Badge>
-
-                            {canApprove && (
-                              <div className="flex items-center gap-1 pl-1">
-                                {!isChildApproved && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-6 px-1.5 text-[11px] text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 gap-1 cursor-pointer"
-                                    title="Approve this content"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onApprove(child.id);
-                                    }}
-                                  >
-                                    <Check className="size-3" /> Approve
-                                  </Button>
-                                )}
-                                {!isChildRejected && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-6 px-1.5 text-[11px] text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/50 gap-1 cursor-pointer"
-                                    title="Reject this content"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onReject(child.id);
-                                    }}
-                                  >
-                                    <X className="size-3" /> Reject
-                                  </Button>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Folder Hierarchy Location Mapping (Textual metadata only - NO screenshot image) */}
-            <div className="rounded-xl border bg-muted/30 p-3.5 text-xs space-y-2">
-              <div className="font-semibold text-foreground flex items-center gap-1.5">
-                <Folder className="size-3.5 text-amber-500" />
-                Folder Hierarchy Location
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-muted-foreground text-[11px]">
-                <div><span className="font-medium text-foreground">Page:</span> {hierarchy.pageName}</div>
-                <div><span className="font-medium text-foreground">Section:</span> {hierarchy.menuName || "Default Section"}</div>
-                <div><span className="font-medium text-foreground">Card / Group:</span> {hierarchy.cardName}</div>
-                <div><span className="font-medium text-foreground">Folder Name:</span> {article.title}</div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* REGULAR CONTENT PREVIEW (Non-Folder) */
-          <>
+        {/* REGULAR CONTENT PREVIEW (Non-Folder: PDF, DOC, Video, Image) */}
+        <>
             {/* Tab 1: Screen Snapshot + Target Highlight */}
             {activeTab === "snapshot" && (
               <div className="space-y-3">
@@ -610,7 +445,6 @@ export function SnapshotViewer({
               </div>
             )}
           </>
-        )}
 
         {/* Tags & Metadata */}
         <div className="pt-2 border-t flex flex-wrap items-center gap-1.5">

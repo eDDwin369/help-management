@@ -219,11 +219,12 @@ export function ApprovalsManager({
     return pages.sort((a, b) => a.pageName.localeCompare(b.pageName));
   }, [filteredArticles]);
 
-  // Auto-select first article if current selection is invalid
+  // Auto-select first article if current selection is invalid (preferring content items with previews)
   useEffect(() => {
     if (filteredArticles.length > 0) {
       if (!selectedId || !filteredArticles.some((a) => a.id === selectedId)) {
-        setSelectedId(filteredArticles[0].id);
+        const firstContent = filteredArticles.find((a) => a.contentType !== "folder");
+        setSelectedId(firstContent ? firstContent.id : filteredArticles[0].id);
       }
     } else {
       setSelectedId(null);
@@ -296,6 +297,9 @@ export function ApprovalsManager({
         archiveStatus: "active",
         authorId: "sub_admin",
         authorName: found.owner,
+        approvedBy: null,
+        approvedAt: null,
+        relatedContext: "Site Recordings › Drawings › " + found.name,
         tags: [found.kind],
         priority: "medium",
         createdAt: new Date().toISOString(),
@@ -643,12 +647,16 @@ export function ApprovalsManager({
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-44 text-xs">
-                                  <DropdownMenuItem onClick={() => setSelectedId(article.id)}>
-                                    <Eye className="size-3.5 mr-2" /> View Preview
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => setFullscreenArticle(article)}>
-                                    <Sparkles className="size-3.5 mr-2 text-purple-500" /> Full Screen
-                                  </DropdownMenuItem>
+                                  {article.contentType !== "folder" && (
+                                    <>
+                                      <DropdownMenuItem onClick={() => setSelectedId(article.id)}>
+                                        <Eye className="size-3.5 mr-2" /> View Preview
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => setFullscreenArticle(article)}>
+                                        <Sparkles className="size-3.5 mr-2 text-purple-500" /> Full Screen
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
                                   <DropdownMenuItem onClick={() => handleCopyLink(article)}>
                                     <Copy className="size-3.5 mr-2" /> Copy Hierarchy Link
                                   </DropdownMenuItem>

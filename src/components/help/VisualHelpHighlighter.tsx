@@ -33,7 +33,6 @@ export function VisualHelpHighlighter() {
   const {
     state: hmsState,
     setContext,
-    openPanel,
     requestPanelView,
     archiveArticle,
     deleteArticle,
@@ -512,21 +511,6 @@ export function VisualHelpHighlighter() {
                   )}
                 </div>
 
-                {/* Modal Footer */}
-                <div className="mt-2 pt-2 border-t border-slate-800 flex justify-end">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-6 text-[11px] text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 px-2 cursor-pointer"
-                    onClick={() => {
-                      setContext(contextKey, label);
-                      openPanel();
-                      setActiveKey(null);
-                    }}
-                  >
-                    Open in HMS Panel →
-                  </Button>
-                </div>
               </div>
             )}
           </div>

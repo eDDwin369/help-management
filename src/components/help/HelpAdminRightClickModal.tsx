@@ -25,7 +25,6 @@ import {
   Video,
   Eye,
   Send,
-  ExternalLink,
   ChevronRight,
   ChevronDown,
   Info,
@@ -176,7 +175,7 @@ function getArticleContextAndHierarchy(
 
 export function HelpAdminRightClickModal() {
   const { user } = useAuth();
-  const { state: hmsState, context, contextKey, addArticle, updateArticle, openPanel, setContext } = useHmsStore();
+  const { state: hmsState, context, contextKey, addArticle, updateArticle, setContext } = useHmsStore();
 
   const isHelpAdmin = user?.role === "sub_admin" || user?.role === "admin";
 
@@ -348,7 +347,6 @@ export function HelpAdminRightClickModal() {
 
   // Add Item Dialog State
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [addMode, setAddMode] = useState<"folder" | "file">("file");
   const [targetParentId, setTargetParentId] = useState<string | null>(null);
   const [itemName, setItemName] = useState("");
   const [itemDescription, setItemDescription] = useState("");
@@ -850,10 +848,9 @@ export function HelpAdminRightClickModal() {
     toast.success("Moved item successfully");
   };
 
-  // Open dialog to create folder or upload file
-  const openAddModal = (parentId: string | null = null, mode: "folder" | "file" = "file") => {
+  // Open dialog to create folder
+  const openAddModal = (parentId: string | null = null) => {
     setTargetParentId(parentId);
-    setAddMode(mode);
     setItemName("");
     setItemDescription("");
     setAddDialogOpen(true);
@@ -1597,19 +1594,6 @@ export function HelpAdminRightClickModal() {
             {sectionNodes.length} folder{sectionNodes.length === 1 ? "" : "s"} / item{sectionNodes.length === 1 ? "" : "s"}
           </span>
 
-          <div className="flex items-center gap-3 pr-2">
-            <button
-              onClick={() => {
-                openPanel();
-                setVisible(false);
-              }}
-              className="hover:text-blue-600 hover:underline font-semibold flex items-center gap-1"
-            >
-              <span>HMS Panel</span>
-              <ExternalLink className="h-3 w-3" />
-            </button>
-          </div>
-
           {/* Visible Bottom-Right Resize Handle */}
           {!isModalExpanded && (
             <div
@@ -1655,7 +1639,7 @@ export function HelpAdminRightClickModal() {
             {folderContextMenu.folderNode.kind === "folder" || folderContextMenu.folderNode.kind === "subfolder" ? (
               <>
                 <button
-                  onClick={() => openAddModal(folderContextMenu.folderNode.id, "folder")}
+                  onClick={() => openAddModal(folderContextMenu.folderNode.id)}
                   className="w-full text-left px-2 py-1.5 rounded hover:bg-muted flex items-center gap-2 text-foreground font-medium"
                 >
                   <FolderPlus className="h-3.5 w-3.5 text-amber-500" />
@@ -1717,100 +1701,48 @@ export function HelpAdminRightClickModal() {
         >
           <DialogHeader>
             <DialogTitle className="text-base font-bold flex items-center gap-2 pr-8">
-              <Plus className="h-4 w-4 text-blue-600 shrink-0" />
-              <span>Add Help Resource</span>
+              <FolderPlus className="h-4 w-4 text-amber-500 shrink-0" />
+              <span>{targetParentId ? "New Subfolder" : "New Folder"}</span>
             </DialogTitle>
           </DialogHeader>
 
-          {/* Mode Tabs */}
-          <div className="flex bg-muted p-1 rounded-lg gap-1 text-xs font-semibold mt-1">
-            <button
-              type="button"
-              onClick={() => setAddMode("file")}
-              className={`flex-1 py-1.5 rounded-md flex items-center justify-center gap-1.5 transition-all ${
-                addMode === "file" ? "bg-white dark:bg-card text-blue-600 shadow-xs" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Upload className="h-3.5 w-3.5" />
-              Upload Content
-            </button>
-            <button
-              type="button"
-              onClick={() => setAddMode("folder")}
-              className={`flex-1 py-1.5 rounded-md flex items-center justify-center gap-1.5 transition-all ${
-                addMode === "folder" ? "bg-white dark:bg-card text-blue-600 shadow-xs" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <FolderPlus className="h-3.5 w-3.5 text-amber-500" />
-              New Folder
-            </button>
-          </div>
-
-          {addMode === "file" ? (
-            <div className="space-y-3 pt-2">
-              <div
-                onClick={() => {
-                  setAddDialogOpen(false);
-                  triggerDirectFileUpload(targetParentId);
-                }}
-                className="border-2 border-dashed border-blue-300 dark:border-blue-800 hover:border-blue-600 rounded-xl p-5 text-center cursor-pointer transition-all bg-blue-50/50 dark:hover:bg-blue-950/30 group"
-              >
-                <Upload className="h-7 w-7 mx-auto text-blue-600 group-hover:scale-110 transition-transform mb-1.5" />
-                <p className="text-xs font-bold text-foreground">Click to upload file</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Images, PDFs, Videos & Docs</p>
-              </div>
-
-              <div className="flex justify-end pt-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 text-xs"
-                  onClick={() => setAddDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-              </div>
+          <form onSubmit={handleCreateNode} className="space-y-3.5 mt-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Folder Name</Label>
+              <Input
+                placeholder="e.g. Site Recordings Manual"
+                value={itemName}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setItemName(e.target.value)}
+                className="h-8 text-xs"
+                autoFocus
+              />
             </div>
-          ) : (
-            <form onSubmit={handleCreateNode} className="space-y-3.5 mt-2">
-              <div className="space-y-1">
-                <Label className="text-xs">Folder Name</Label>
-                <Input
-                  placeholder="e.g. Site Recordings Manual"
-                  value={itemName}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setItemName(e.target.value)}
-                  className="h-8 text-xs"
-                  autoFocus
-                />
-              </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs">Description (Optional)</Label>
-                <Textarea
-                  placeholder="Brief summary for users..."
-                  value={itemDescription}
-                  onChange={(e) => setItemDescription(e.target.value)}
-                  className="h-16 text-xs resize-none"
-                />
-              </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Description (Optional)</Label>
+              <Textarea
+                placeholder="Brief summary for users..."
+                value={itemDescription}
+                onChange={(e) => setItemDescription(e.target.value)}
+                className="h-16 text-xs resize-none"
+              />
+            </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 text-xs"
-                  onClick={() => setAddDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" size="sm" className="h-8 text-xs bg-blue-600 hover:bg-blue-700">
-                  Create Folder
-                </Button>
-              </div>
-            </form>
-          )}
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => setAddDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" size="sm" className="h-8 text-xs bg-blue-600 hover:bg-blue-700">
+                Create Folder
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
 
